@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "nexsus1": {
+      "command": "node",
+      "args": [
+        "C:\\Users\\KasunJ\\MCP\\Nexsus1\\dist\\console\\index.js"
+      ],
+      "env": {
+        "UNIFIED_COLLECTION_NAME": "nexsus1_unified",
+        "NODE_TLS_REJECT_UNAUTHORIZED": "0"
+      },
+      "description": "Nexsus1 - Self-describing vector database for Excel data (standalone)"
+    }
+  }
+}

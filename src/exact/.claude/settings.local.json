@@ -1,0 +1,11 @@
+{
+  "enabledMcpjsonServers": [
+    "nexsus",
+    "nexsus-cloud"
+  ],
+  "permissions": {
+    "allow": [
+      "Bash(npm run build:*)"
+    ]
+  }
+}

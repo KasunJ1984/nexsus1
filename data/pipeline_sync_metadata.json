@@ -1,0 +1,102 @@
+{
+  "account.account": {
+    "last_sync_timestamp": "2025-12-17T21:57:40.724Z",
+    "record_count": 5,
+    "field_count": 10
+  },
+  "crm.lead": {
+    "last_sync_timestamp": "2025-12-18T00:39:36.929Z",
+    "record_count": 10,
+    "field_count": 20
+  },
+  "crm.stage": {
+    "last_sync_timestamp": "2025-12-21T18:35:14.737Z",
+    "record_count": 15,
+    "field_count": 6
+  },
+  "res.users": {
+    "last_sync_timestamp": "2025-12-30T19:34:55.392Z",
+    "record_count": 7,
+    "field_count": 68
+  },
+  "res.company": {
+    "last_sync_timestamp": "2025-12-21T18:55:32.954Z",
+    "record_count": 1,
+    "field_count": 77
+  },
+  "ir.ui.menu": {
+    "last_sync_timestamp": "2025-12-28T19:01:48.200Z",
+    "record_count": 647,
+    "field_count": 9
+  },
+  "ir.actions.act_window": {
+    "last_sync_timestamp": "2025-12-28T19:52:08.187Z",
+    "record_count": 847,
+    "field_count": 17
+  },
+  "mrp.production": {
+    "last_sync_timestamp": "2025-12-28T20:26:27.138Z",
+    "record_count": 173,
+    "field_count": 58
+  },
+  "account.move": {
+    "last_sync_timestamp": "2025-12-30T19:34:50.268Z",
+    "record_count": 11,
+    "field_count": 80
+  },
+  "res.partner": {
+    "last_sync_timestamp": "2025-12-30T19:34:54.005Z",
+    "record_count": 21,
+    "field_count": 71
+  },
+  "account.account.tag": {
+    "last_sync_timestamp": "2025-12-29T21:21:30.158Z",
+    "record_count": 1,
+    "field_count": 7
+  },
+  "stock.valuation.layer": {
+    "last_sync_timestamp": "2025-12-29T21:21:32.790Z",
+    "record_count": 27,
+    "field_count": 16
+  },
+  "account.analytic.account": {
+    "last_sync_timestamp": "2025-12-29T21:28:20.885Z",
+    "record_count": 5011,
+    "field_count": 20
+  },
+  "product.product": {
+    "last_sync_timestamp": "2025-12-30T19:11:09.426Z",
+    "record_count": 19448,
+    "field_count": 55
+  },
+  "account.journal": {
+    "last_sync_timestamp": "2025-12-30T19:34:51.405Z",
+    "record_count": 1,
+    "field_count": 33
+  },
+  "sale.order.line": {
+    "last_sync_timestamp": "2025-12-30T19:58:18.666Z",
+    "record_count": 9920,
+    "field_count": 34
+  },
+  "account.partial.reconcile": {
+    "last_sync_timestamp": "2025-12-30T19:40:11.947Z",
+    "record_count": 3364,
+    "field_count": 13
+  },
+  "purchase.order.line": {
+    "last_sync_timestamp": "2025-12-30T19:40:31.193Z",
+    "record_count": 449,
+    "field_count": 20
+  },
+  "account.move.line": {
+    "last_sync_timestamp": "2025-12-30T21:53:22.520Z",
+    "record_count": 14705,
+    "field_count": 54
+  },
+  "account.analytic.line": {
+    "last_sync_timestamp": "2025-12-31T00:52:37.528Z",
+    "record_count": 158861,
+    "field_count": 25
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "mcpServers": {
+    "nexsus": {
+      "type": "stdio",
+      "command": "C:/Program Files/nodejs/node.exe",
+      "args": ["dist/console/index.js"],
+      "cwd": "C:/Users/KasunJ/MCP/Nexsus",
+      "env": {
+        "ODOO_URL": "https://duracubeuat.com.au",
+        "ODOO_DB": "25_04_07",
+        "ODOO_USERNAME": "kasun.jayasinghe@duracube.com.au",
+        "ODOO_PASSWORD": "9b8391d2bac4c6c9d9085b112b808a7801a83321",
+        "QDRANT_HOST": "https://75404e45-06cd-4891-9572-65bd31cdd3f4.ap-southeast-2-0.aws.cloud.qdrant.io:6333",
+        "QDRANT_API_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhY2Nlc3MiOiJtIn0.CMN-o5lEmNVkInzcpz2S3UajBAw6_d7Op9EQlL2UxaE",
+        "VOYAGE_API_KEY": "pa-MXQ8Qp1Esl3ID0N2c_dBpHYbaIMLYwruVGZB_0tDS9u",
+        "EMBEDDING_MODEL": "voyage-3.5-lite",
+        "TRANSPORT": "stdio",
+        "NODE_TLS_REJECT_UNAUTHORIZED": "0"
+      }
+    },
+    "nexsus-cloud": {
+      "type": "http",
+      "url": "https://nexsus-production.up.railway.app/mcp"
+    }
+  }
+}

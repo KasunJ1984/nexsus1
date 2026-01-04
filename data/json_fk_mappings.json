@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "description": "JSON FK field mappings - maps JSON field keys to target models",
+  "mappings": [
+    {
+      "source_model": "account.move.line",
+      "field_name": "analytic_distribution",
+      "key_target_model": "account.analytic.account",
+      "key_target_model_id": 177,
+      "key_type": "record_id",
+      "value_type": "percentage"
+    }
+  ]
+}

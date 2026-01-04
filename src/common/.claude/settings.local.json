@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:developers.cloudflare.com)",
+      "Bash(grep:*)",
+      "Bash(cat:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm run sync:*)",
+      "Bash(npx tsx:*)",
+      "Bash(node:*)"
+    ]
+  },
+  "enabledMcpjsonServers": [
+    "nexsus",
+    "nexsus-cloud"
+  ]
+}

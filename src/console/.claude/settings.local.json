@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir:*)",
+      "Bash(npm run build:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(ls:*)",
+      "mcp__nexsus-cloud__blendthink_diagnose",
+      "Bash(powershell -Command \"cd ''C:\\\\Users\\\\KasunJ\\\\MCP\\\\Nexsus'' ; npm run build 2>&1 | Select-Object -Last 10\")",
+      "Bash(powershell:*)",
+      "mcp__nexsus-cloud__blendthink_execute"
+    ]
+  },
+  "enabledMcpjsonServers": [
+    "nexsus",
+    "nexsus-cloud"
+  ]
+}
