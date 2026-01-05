@@ -35,6 +35,7 @@ import {
 } from './schema-query-service.js';
 import { buildDataUuidV2 } from '../utils/uuid-v2.js';
 import { upsertRelationship } from './knowledge-graph.js';
+import { ensureModelIndexes } from './index-service.js';
 import type { PipelineDataPoint, PipelineField, RelationshipType } from '../types.js';
 
 // =============================================================================
@@ -516,6 +517,12 @@ export async function syncExcelData(
     const graphResult = await updateKnowledgeGraph(modelName, modelId, records, schemaFields);
     if (graphResult.edges_created > 0) {
       console.error(chalk.green(`[ExcelDataSync] Created ${graphResult.edges_created} graph edges`));
+    }
+
+    // Ensure payload indexes exist (automatic - no config needed)
+    const indexResult = await ensureModelIndexes(modelName, schemaFields);
+    if (indexResult.created > 0) {
+      console.error(chalk.green(`[ExcelDataSync] Created ${indexResult.created} indexes`));
     }
   }
 

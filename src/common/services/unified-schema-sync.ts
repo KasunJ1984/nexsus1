@@ -23,6 +23,7 @@ import { getQdrantClient, isVectorClientAvailable, collectionExists, createUnifi
 import { buildSchemaFkRefUuidV2 } from '../utils/uuid-v2.js';
 import { getOdooClient } from './odoo-client.js';
 import { clearSchemaCache } from './schema-query-service.js';
+import { ensureBaseIndexes } from './index-service.js';
 import type { NexsusSchemaRow, NexsusSyncResult } from '../types.js';
 
 // Sync state
@@ -407,6 +408,12 @@ export async function syncSchemaToUnified(
     // G13: Clear schema query cache so pipeline uses fresh data
     clearSchemaCache();
     console.error('[UnifiedSchemaSync] Schema cache cleared');
+
+    // Ensure base indexes exist (automatic - no config needed)
+    const indexResult = await ensureBaseIndexes();
+    if (indexResult.created > 0) {
+      console.error(`[UnifiedSchemaSync] Created ${indexResult.created} base indexes`);
+    }
 
     return {
       success: errors.length === 0,
