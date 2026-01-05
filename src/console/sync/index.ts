@@ -17,6 +17,7 @@ import 'dotenv/config';
 import { Command } from 'commander';
 import { syncModelCommand } from './commands/sync-model.js';
 import { syncSchemaCommand } from './commands/sync-schema.js';
+import { syncDataCommand } from './commands/sync-data.js';
 import { cleanupCommand } from './commands/cleanup.js';
 import { validateFkCommand } from './commands/validate-fk.js';
 import { analyzePatternsCommand } from './commands/analyze-patterns.js';
@@ -58,6 +59,16 @@ syncCmd
   .option('--source <source>', 'Schema source: excel or odoo', 'excel')
   .option('--force', 'Force recreate schema (delete existing)', false)
   .action(syncSchemaCommand);
+
+// sync data <model_name> - Sync data from Excel files
+syncCmd
+  .command('data <model_name>')
+  .description('Sync data from Excel file (use "all" to sync all data files)')
+  .option('--file <path>', 'Custom Excel file path')
+  .option('--dry-run', 'Preview without syncing', false)
+  .option('--skip-cascade', 'Skip FK cascade to related models', false)
+  .option('--force', 'Force re-sync even if records exist', false)
+  .action(syncDataCommand);
 
 // sync knowledge
 syncCmd
