@@ -23,6 +23,7 @@ import {
 } from './schema-query-service.js';
 import { buildDataUuidV2 } from '../utils/uuid-v2.js';
 import { getJsonFkMapping } from './json-fk-config.js';
+import { extractFkValueBySchema } from '../utils/fk-value-extractor.js';
 import type {
   PipelineField,
   EncodedPipelineRecord,
@@ -256,18 +257,29 @@ export function buildPayload(
       continue;
     }
 
-    // For many2one, store ID, name, and FK Qdrant UUID
-    if (field.field_type === 'many2one' && Array.isArray(value) && value.length >= 2) {
-      // Store as string for readability in payload
-      payload[field.field_name] = value[1]; // Store the name
-      payload[`${field.field_name}_id`] = value[0]; // Also store the ID
+    // For many2one, use schema-driven FK extraction (handles scalar, tuple, expanded formats)
+    if (field.field_type === 'many2one') {
+      const fkResult = extractFkValueBySchema(record, {
+        field_id: field.field_id || 0,
+        field_name: field.field_name,
+        field_type: field.field_type,
+      });
 
-      // Build FK Qdrant UUID if FK metadata exists in schema
-      // This enables graph traversal by direct UUID lookup
-      if (field.fk_location_model_id) {
-        const fkRecordId = value[0] as number;
-        const fkQdrantId = buildDataUuidV2(field.fk_location_model_id, fkRecordId);
-        payload[`${field.field_name}_qdrant`] = fkQdrantId;
+      if (fkResult.fkId !== undefined) {
+        // Always store FK ID in _id field for consistent querying
+        payload[`${field.field_name}_id`] = fkResult.fkId;
+
+        // Store display name if available (from tuple format)
+        if (fkResult.displayName) {
+          payload[field.field_name] = fkResult.displayName;
+        }
+
+        // Build FK Qdrant UUID if FK metadata exists in schema
+        // This enables graph traversal by direct UUID lookup
+        if (field.fk_location_model_id) {
+          const fkQdrantId = buildDataUuidV2(field.fk_location_model_id, fkResult.fkId);
+          payload[`${field.field_name}_qdrant`] = fkQdrantId;
+        }
       }
     }
     // For one2many/many2many, store the array of IDs AND build FK Qdrant UUIDs

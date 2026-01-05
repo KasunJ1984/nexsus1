@@ -34,6 +34,7 @@ import {
   getFkFieldsFromSchema,
 } from './schema-query-service.js';
 import { buildDataUuidV2 } from '../utils/uuid-v2.js';
+import { extractFkValueBySchema } from '../utils/fk-value-extractor.js';
 import { upsertRelationship } from './knowledge-graph.js';
 import { ensureModelIndexes } from './index-service.js';
 import type { PipelineDataPoint, PipelineField, RelationshipType } from '../types.js';
@@ -153,13 +154,20 @@ function generateSemanticText(
     // Format based on field type
     let displayValue: string;
     if (field.field_type === 'many2one') {
-      // For FK fields, show the display name if available
-      const displayName = record[field.field_name];
-      const fkId = record[`${field.field_name}_id`];
-      if (displayName && fkId) {
-        displayValue = `${displayName} (id: ${fkId})`;
-      } else if (displayName) {
-        displayValue = String(displayName);
+      // Use schema-driven FK extraction (supports scalar, tuple, and expanded formats)
+      const fkResult = extractFkValueBySchema(record, {
+        field_id: (field as { field_id?: number }).field_id || 0,
+        field_name: field.field_name,
+        field_type: field.field_type,
+      });
+
+      if (fkResult.fkId !== undefined) {
+        if (fkResult.displayName) {
+          displayValue = `${fkResult.displayName} (id: ${fkResult.fkId})`;
+        } else {
+          // For scalar format (Excel), value might be just the ID
+          displayValue = `id: ${fkResult.fkId}`;
+        }
       } else {
         displayValue = String(value);
       }
@@ -208,15 +216,25 @@ async function transformRecords(
       }
     }
 
-    // Add FK Qdrant UUIDs for many2one fields
+    // Add FK Qdrant UUIDs for many2one fields (using schema-driven extraction)
     for (const field of schemaFields) {
       if (field.field_type === 'many2one' && field.fk_location_model_id) {
-        const fkIdField = `${field.field_name}_id`;
-        const fkId = record[fkIdField] as number | undefined;
+        // Use schema-driven FK extraction (supports scalar, tuple, and expanded formats)
+        const fkResult = extractFkValueBySchema(record, {
+          field_id: field.field_id || 0,
+          field_name: field.field_name,
+          field_type: field.field_type,
+        });
 
-        if (fkId && typeof fkId === 'number') {
-          const fkQdrantId = buildDataUuidV2(field.fk_location_model_id, fkId);
+        if (fkResult.fkId !== undefined) {
+          // Build FK Qdrant UUID for graph traversal
+          const fkQdrantId = buildDataUuidV2(field.fk_location_model_id, fkResult.fkId);
           payload[`${field.field_name}_qdrant`] = fkQdrantId;
+
+          // Normalize: always store FK ID in _id field for consistent querying
+          if (fkResult.source === 'scalar') {
+            payload[`${field.field_name}_id`] = fkResult.fkId;
+          }
         }
       }
     }
@@ -259,12 +277,15 @@ async function extractFkTargets(
     const targetIds = new Set<number>();
 
     for (const record of records) {
-      // FK value can be in field_name_id (e.g., country_id_id)
-      const fkIdField = `${fkField.field_name}_id`;
-      const fkId = record[fkIdField] as number | undefined;
+      // Use schema-driven FK extraction (supports scalar, tuple, and expanded formats)
+      const fkResult = extractFkValueBySchema(record, {
+        field_id: fkField.field_id || 0,
+        field_name: fkField.field_name,
+        field_type: fkField.field_type,
+      });
 
-      if (fkId && typeof fkId === 'number') {
-        targetIds.add(fkId);
+      if (fkResult.fkId !== undefined) {
+        targetIds.add(fkResult.fkId);
       }
     }
 
@@ -299,13 +320,16 @@ async function updateKnowledgeGraph(
   );
 
   for (const fkField of fkFields) {
-    // Collect unique FK IDs from all records
+    // Collect unique FK IDs from all records (using schema-driven extraction)
     const fkIds = new Set<number>();
     for (const record of records) {
-      const fkIdField = `${fkField.field_name}_id`;
-      const fkId = record[fkIdField] as number | undefined;
-      if (fkId && typeof fkId === 'number') {
-        fkIds.add(fkId);
+      const fkResult = extractFkValueBySchema(record, {
+        field_id: fkField.field_id || 0,
+        field_name: fkField.field_name,
+        field_type: fkField.field_type,
+      });
+      if (fkResult.fkId !== undefined) {
+        fkIds.add(fkResult.fkId);
       }
     }
 

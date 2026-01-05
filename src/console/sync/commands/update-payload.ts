@@ -28,6 +28,7 @@ import {
   getModelIdFromSchema,
 } from '../../../common/services/schema-query-service.js';
 import { registerIndexedFields } from '../../../common/services/schema-lookup.js';
+import { extractFkValueBySchema } from '../../../common/utils/fk-value-extractor.js';
 import { UNIFIED_CONFIG } from '../../../common/constants.js';
 
 interface UpdatePayloadOptions {
@@ -220,14 +221,28 @@ export async function updatePayloadCommand(
           };
 
           // Add all payload fields from fresh data
-          for (const fieldName of payloadFieldNames) {
+          for (const field of payloadFields) {
+            const fieldName = field.field_name;
             const value = freshData[fieldName] as unknown;
             if (value !== null && value !== undefined && value !== '') {
-              // Handle many2one fields (Odoo returns [id, name] tuple)
-              if (Array.isArray(value) && value.length === 2) {
-                newPayload[fieldName] = value;
-                newPayload[`${fieldName}_id`] = value[0];
-                newPayload[`${fieldName}_name`] = value[1];
+              // Handle many2one fields using schema-driven extraction (handles scalar, tuple, expanded formats)
+              if (field.field_type === 'many2one') {
+                const fkResult = extractFkValueBySchema(freshData as Record<string, unknown>, {
+                  field_id: field.field_id || 0,
+                  field_name: field.field_name,
+                  field_type: field.field_type,
+                });
+
+                if (fkResult.fkId !== undefined) {
+                  // Always store FK ID in _id field for consistent querying
+                  newPayload[`${fieldName}_id`] = fkResult.fkId;
+
+                  // Store display name if available (from tuple format)
+                  if (fkResult.displayName) {
+                    newPayload[fieldName] = fkResult.displayName;
+                    newPayload[`${fieldName}_name`] = fkResult.displayName;
+                  }
+                }
               } else {
                 newPayload[fieldName] = value;
               }
