@@ -20,7 +20,7 @@
  * preserved in both semantic_text and raw_payload to enable knowledge graph edge creation.
  */
 
-import { buildSchemaUuidV2, buildSchemaFkRefUuidV2 } from '../utils/uuid-v2.js';
+import { buildSchemaUuidV2Simple, buildSchemaFkRefUuidV2 } from '../utils/uuid-v2.js';
 import type { SimpleSchemaRow, NexsusSchemaRow } from '../types.js';
 
 /**
@@ -165,9 +165,10 @@ export function validateSimpleSchema(rows: SimpleSchemaRow[]): ValidationResult 
  * knowledge graph edge creation and traversal.
  *
  * @param row - Simple schema row
+ * @param fkUuid - Optional FK Qdrant UUID (for many2one fields)
  * @returns Semantic text string for embedding
  */
-export function generateSemanticText(row: SimpleSchemaRow): string {
+export function generateSemanticText(row: SimpleSchemaRow, fkUuid?: string): string {
   // Base semantic text
   let text =
     `In model ${row.Model_Name}, ` +
@@ -194,6 +195,11 @@ export function generateSemanticText(row: SimpleSchemaRow): string {
 
   if (fkRecordId !== undefined && fkRecordId !== null) {
     text += `, FK location record Id - ${fkRecordId}`;
+  }
+
+  // Add FK Qdrant UUID if available (CRITICAL for graph traversal)
+  if (fkUuid) {
+    text += `, Qdrant ID for FK - ${fkUuid}`;
   }
 
   return text;
@@ -278,8 +284,8 @@ export function convertSimpleSchemaToNexsus(rows: SimpleSchemaRow[]): NexsusSche
 
   // Convert each row
   const converted: NexsusSchemaRow[] = rows.map((row) => {
-    // Generate V2 UUID for this field
-    const uuid = buildSchemaUuidV2(row.Field_ID);
+    // Generate V2 UUID for this field using actual model_id (not hardcoded 0004)
+    const uuid = buildSchemaUuidV2Simple(row.Field_ID, row.Model_ID);
 
     // Generate FK reference UUID if FK field (handle leading spaces)
     const fkModelId = getFkField<number>(row, 'FK location field model id');
@@ -290,8 +296,8 @@ export function convertSimpleSchemaToNexsus(rows: SimpleSchemaRow[]): NexsusSche
       fkUuid = buildSchemaFkRefUuidV2(fkModelId, fkRecordId);
     }
 
-    // Generate semantic text (auto)
-    const semanticText = generateSemanticText(row);
+    // Generate semantic text (auto) - pass FK UUID for graph traversal
+    const semanticText = generateSemanticText(row, fkUuid);
 
     // Generate payload string (auto)
     const payloadString = generatePayloadString(row, uuid);

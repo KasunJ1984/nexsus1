@@ -138,6 +138,42 @@ export function buildSchemaUuidV2(fieldId: number): string {
 }
 
 /**
+ * Build Schema UUID V2 for Simple Schema Format
+ *
+ * Creates a schema UUID using the model_id from the simple schema format.
+ * Unlike buildSchemaUuidV2() which hardcodes 0004, this function uses the
+ * actual model_id from the user's schema.
+ *
+ * Format: 00000003-MMMM-0000-0000-FFFFFFFFFFFF
+ * - Segment 1: 00000003 (schema namespace)
+ * - Segment 2: MMMM (model_id from simple schema, 4 digits)
+ * - Segment 3: 0000 (reserved)
+ * - Segment 4: 0000 (reserved)
+ * - Segment 5: FFFFFFFFFFFF (field_id, 12 digits)
+ *
+ * @param fieldId - Field ID from schema
+ * @param modelId - Model ID from schema (not hardcoded)
+ * @returns UUID string
+ *
+ * @example
+ * buildSchemaUuidV2Simple(202, 2)  // country.name (field_id=202, model_id=2)
+ * // Returns: "00000003-0002-0000-0000-000000000202"
+ *
+ * @example
+ * buildSchemaUuidV2Simple(104, 1)  // customer.country_id (field_id=104, model_id=1)
+ * // Returns: "00000003-0001-0000-0000-000000000104"
+ */
+export function buildSchemaUuidV2Simple(fieldId: number, modelId: number): string {
+  if (fieldId === undefined || isNaN(fieldId)) {
+    throw new Error(`Invalid fieldId: ${fieldId}`);
+  }
+  if (modelId === undefined || isNaN(modelId)) {
+    throw new Error(`Invalid modelId: ${modelId}`);
+  }
+  return `${UUID_NAMESPACES.SCHEMA}-${pad(modelId, 4)}-0000-0000-${pad(fieldId, 12)}`;
+}
+
+/**
  * Build V2 Schema FK Reference UUID
  *
  * Creates a reference UUID pointing to a target schema entry.

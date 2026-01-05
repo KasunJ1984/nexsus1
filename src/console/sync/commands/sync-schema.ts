@@ -46,15 +46,25 @@ export async function syncSchemaCommand(options: SyncSchemaOptions): Promise<voi
     process.exit(1);
   }
 
-  // Get current schema count
+  // Get current schema count (handle collection not existing yet)
   const client = getQdrantClient();
-  const beforeCount = await client.count(UNIFIED_CONFIG.COLLECTION_NAME, {
-    filter: {
-      must: [{ key: 'point_type', match: { value: 'schema' } }],
-    },
-    exact: true,
-  });
-  console.log(chalk.white('Current schema points:'), chalk.cyan(beforeCount.count.toLocaleString()));
+  let beforeCount = { count: 0 };
+  try {
+    beforeCount = await client.count(UNIFIED_CONFIG.COLLECTION_NAME, {
+      filter: {
+        must: [{ key: 'point_type', match: { value: 'schema' } }],
+      },
+      exact: true,
+    });
+    console.log(chalk.white('Current schema points:'), chalk.cyan(beforeCount.count.toLocaleString()));
+  } catch (error: any) {
+    // Collection doesn't exist yet - that's okay, it will be created
+    if (error.status === 404) {
+      console.log(chalk.white('Current schema points:'), chalk.cyan('0 (collection will be created)'));
+    } else {
+      throw error; // Re-throw if it's a different error
+    }
+  }
 
   // Delete existing schema if force
   if (options.force && beforeCount.count > 0) {
@@ -80,7 +90,19 @@ export async function syncSchemaCommand(options: SyncSchemaOptions): Promise<voi
   try {
     if (options.source === 'excel') {
       // Use unified schema sync (from Excel)
-      await syncSchemaToUnified();
+      console.log(chalk.dim('Calling syncSchemaToUnified()...'));
+      const result = await syncSchemaToUnified();
+
+      if (!result.success) {
+        console.log(chalk.red('\n❌ Schema sync failed!'));
+        if (result.errors && result.errors.length > 0) {
+          console.log(chalk.red('Errors:'));
+          result.errors.forEach(err => console.log(chalk.red(`  - ${err}`)));
+        }
+        process.exit(1);
+      }
+
+      console.log(chalk.green(`✅ Synced ${result.uploaded} schema rows successfully`));
 
       // G13: Auto-clear schema cache so pipeline uses fresh schema
       clearSchemaCache();
@@ -93,13 +115,23 @@ export async function syncSchemaCommand(options: SyncSchemaOptions): Promise<voi
       process.exit(1);
     }
 
-    // Get final count
-    const afterCount = await client.count(UNIFIED_CONFIG.COLLECTION_NAME, {
-      filter: {
-        must: [{ key: 'point_type', match: { value: 'schema' } }],
-      },
-      exact: true,
-    });
+    // Get final count (handle collection not existing - means sync failed)
+    let afterCount = { count: 0 };
+    try {
+      afterCount = await client.count(UNIFIED_CONFIG.COLLECTION_NAME, {
+        filter: {
+          must: [{ key: 'point_type', match: { value: 'schema' } }],
+        },
+        exact: true,
+      });
+    } catch (error: any) {
+      if (error.status === 404) {
+        console.log(chalk.red('\n❌ Collection was not created during sync. Sync may have failed.'));
+        afterCount = { count: 0 };
+      } else {
+        throw error;
+      }
+    }
 
     const duration = ((Date.now() - startTime) / 1000).toFixed(1);
 
