@@ -72,6 +72,10 @@ export async function syncSchemaCommand(options: SyncSchemaOptions): Promise<voi
   console.log(chalk.bold('\n' + '-'.repeat(60)));
   console.log(chalk.bold.cyan('Syncing Schema...'));
   console.log(chalk.bold('-'.repeat(60) + '\n'));
+  console.log(chalk.dim('Supported formats: V2 (3-column) or Simple (11-column) - auto-detected'));
+  console.log(chalk.dim('  • V2: Qdrant ID, Vector, Payload'));
+  console.log(chalk.dim('  • Simple: Field_ID, Model_ID, Field_Name, Field_Label, ...'));
+  console.log('');
 
   try {
     if (options.source === 'excel') {

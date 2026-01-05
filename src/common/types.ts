@@ -798,6 +798,54 @@ export interface NexsusSchemaRow {
 }
 
 /**
+ * Simple Schema Row - User's simplified 11-column format
+ * Used by simple-schema-converter.ts
+ *
+ * This format allows users to provide schema in a human-readable Excel format
+ * without having to manually generate semantic text and payload strings.
+ * The converter auto-generates:
+ * - V2 UUIDs (00000003-0004-0000-0000-{field_id})
+ * - Semantic text for embedding
+ * - Payload strings for Qdrant storage
+ *
+ * FK Metadata is CRITICAL: Used to build knowledge graph edges
+ */
+export interface SimpleSchemaRow {
+  /** Unique field identifier (user-assigned) */
+  Field_ID: number;
+
+  /** Model identifier (user-assigned) */
+  Model_ID: number;
+
+  /** Technical field name (e.g., "country_id") */
+  Field_Name: string;
+
+  /** Display label (e.g., "Country") */
+  Field_Label: string;
+
+  /** Odoo field type (e.g., "many2one", "char", "integer") */
+  Field_Type: string;
+
+  /** Model technical name (e.g., "customer", "res.partner") */
+  Model_Name: string;
+
+  /** "Yes" or "No" - indicates if field is stored in database */
+  Stored: string;
+
+  /** For FK fields: Target model name (e.g., "country") */
+  'FK location field model'?: string;
+
+  /** For FK fields: Target model ID (e.g., 2) - CRITICAL for graph edges */
+  'FK location field model id'?: number;
+
+  /** For FK fields: Target field ID (e.g., 201 for id field) - CRITICAL for graph edges */
+  'FK location record Id'?: number;
+
+  /** For FK fields: Auto-generated Qdrant UUID reference (optional in user input) */
+  'Qdrant ID for FK'?: string;
+}
+
+/**
  * Payload structure for nexsus collection in Qdrant
  *
  * This is what gets stored in each Qdrant point's payload.

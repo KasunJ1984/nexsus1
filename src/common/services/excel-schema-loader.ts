@@ -26,7 +26,8 @@ import XLSX from 'xlsx';
 import * as fs from 'fs';
 import * as path from 'path';
 import { NEXSUS_CONFIG } from '../constants.js';
-import type { NexsusSchemaRow } from '../types.js';
+import type { NexsusSchemaRow, SimpleSchemaRow } from '../types.js';
+import { convertSimpleSchemaToNexsus } from './simple-schema-converter.js';
 
 // Cache for loaded schema
 let schemaCache: NexsusSchemaRow[] | null = null;
@@ -104,47 +105,113 @@ function parsePayloadFields(payloadStr: string): Partial<NexsusSchemaRow> {
 }
 
 /**
- * Extract numeric ID from vector_id string
+ * Detect schema format from Excel workbook
  *
- * @param vectorId - Full vector ID (e.g., "4^28105")
- * @returns Numeric part (e.g., 28105)
+ * Supports two formats:
+ * - V2 Format: 3 columns (Qdrant ID, Vector, Payload) with UUID in A2
+ * - Simple Format: 11 columns (Field_ID, Model_ID, Field_Name, etc.)
+ *
+ * @param workbook - XLSX workbook object
+ * @returns 'v2' or 'simple'
+ * @throws Error if format cannot be detected
  */
-export function extractNumericId(vectorId: string): number {
-  // Format is "4^XXXXX" - extract the number after ^
-  const parts = vectorId.split('^');
-  if (parts.length >= 2) {
-    return parseInt(parts[1], 10);
+function detectSchemaFormat(workbook: XLSX.WorkBook): 'v2' | 'simple' {
+  const sheetName = workbook.SheetNames[0];
+  const sheet = workbook.Sheets[sheetName];
+
+  // Get the sheet range
+  const range = XLSX.utils.decode_range(sheet['!ref'] || 'A1');
+
+  // Get header row
+  const headers: string[] = [];
+  for (let col = range.s.c; col <= range.e.c; col++) {
+    const cellAddress = XLSX.utils.encode_cell({ r: 0, c: col });
+    const cell = sheet[cellAddress];
+    if (cell) {
+      headers.push(String(cell.v).trim());
+    }
   }
-  // Fallback: try to parse the whole string
-  return parseInt(vectorId, 10);
+
+  console.error(`[NexsusLoader] Detected ${headers.length} columns with headers:`, headers);
+
+  // Check for V2 format (3 columns with UUID in A2)
+  if (headers.length === 3) {
+    const a2Cell = sheet['A2'];
+    if (a2Cell) {
+      const a2Value = String(a2Cell.v).trim();
+      // Check if A2 contains a UUID
+      if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(a2Value)) {
+        console.error('[NexsusLoader] Detected V2 format (3 columns with UUID)');
+        return 'v2';
+      }
+    }
+  }
+
+  // Check for Simple format (11 columns with specific headers)
+  const simpleFormatColumns = [
+    'Field_ID',
+    'Model_ID',
+    'Field_Name',
+    'Field_Label',
+    'Field_Type',
+    'Model_Name',
+    'Stored',
+  ];
+
+  // Check if all required Simple format columns are present (case-insensitive)
+  const hasSimpleFormat = simpleFormatColumns.every((col) =>
+    headers.some((h) => h.toLowerCase() === col.toLowerCase()),
+  );
+
+  if (hasSimpleFormat) {
+    console.error('[NexsusLoader] Detected Simple format (11 columns with Field_ID, Model_ID, etc.)');
+    return 'simple';
+  }
+
+  // Unable to detect format
+  throw new Error(
+    `Unable to detect schema format.\n` +
+      `Expected either:\n` +
+      `  - V2 format: 3 columns with UUID in A2\n` +
+      `  - Simple format: 11 columns with headers: ${simpleFormatColumns.join(', ')}\n` +
+      `Found ${headers.length} columns: ${headers.join(', ')}`,
+  );
 }
 
 /**
- * Load schema from Excel file
+ * Load schema from Simple format Excel file
  *
- * Reads nexsus_schema_v2_generated.xlsx and parses all rows into
- * NexsusSchemaRow objects. Results are cached for performance.
+ * Parses user's simplified 11-column format and converts to NexsusSchemaRow format.
  *
- * @param filePath - Optional path to Excel file (defaults to NEXSUS_CONFIG.EXCEL_FILE)
+ * @param workbook - XLSX workbook object
  * @returns Array of parsed schema rows
  */
-export function loadNexsusSchema(filePath?: string): NexsusSchemaRow[] {
-  // Return cached if available
-  if (schemaCache !== null) {
-    console.error(`[NexsusLoader] Using cached schema (${schemaCache.length} rows)`);
-    return schemaCache;
-  }
+function loadSimpleFormatSchema(workbook: XLSX.WorkBook): NexsusSchemaRow[] {
+  const sheetName = workbook.SheetNames[0];
+  const sheet = workbook.Sheets[sheetName];
 
-  const excelPath = filePath || path.resolve(process.cwd(), NEXSUS_CONFIG.EXCEL_FILE);
-  console.error(`[NexsusLoader] Loading schema from: ${excelPath}`);
+  // Parse Excel with headers
+  const rawData: SimpleSchemaRow[] = XLSX.utils.sheet_to_json<SimpleSchemaRow>(sheet);
 
-  if (!fs.existsSync(excelPath)) {
-    console.error(`[NexsusLoader] Excel file not found: ${excelPath}`);
-    return [];
-  }
+  console.error(`[NexsusLoader] Loaded ${rawData.length} rows from Simple format`);
 
-  // Read Excel file
-  const workbook = XLSX.readFile(excelPath);
+  // Convert to NexsusSchemaRow format using converter
+  const converted = convertSimpleSchemaToNexsus(rawData);
+
+  console.error(`[NexsusLoader] Converted ${converted.length} schemas from Simple format`);
+
+  return converted;
+}
+
+/**
+ * Load schema from V2 format Excel file
+ *
+ * Parses the existing 3-column V2 format (Qdrant ID, Vector, Payload).
+ *
+ * @param workbook - XLSX workbook object
+ * @returns Array of parsed schema rows
+ */
+function loadV2FormatSchema(workbook: XLSX.WorkBook): NexsusSchemaRow[] {
   const sheetName = workbook.SheetNames[0];
   const sheet = workbook.Sheets[sheetName];
 
@@ -154,7 +221,7 @@ export function loadNexsusSchema(filePath?: string): NexsusSchemaRow[] {
     defval: '',
   });
 
-  console.error(`[NexsusLoader] Found ${rawData.length} rows in Excel (including header)`);
+  console.error(`[NexsusLoader] Found ${rawData.length} rows in V2 format (including header)`);
 
   const schemas: NexsusSchemaRow[] = [];
   let parseErrors = 0;
@@ -215,7 +282,64 @@ export function loadNexsusSchema(filePath?: string): NexsusSchemaRow[] {
     }
   }
 
-  console.error(`[NexsusLoader] Parsed ${schemas.length} schemas (${parseErrors} errors)`);
+  console.error(`[NexsusLoader] Parsed ${schemas.length} schemas from V2 format (${parseErrors} errors)`);
+
+  return schemas;
+}
+
+/**
+ * Extract numeric ID from vector_id string
+ *
+ * @param vectorId - Full vector ID (e.g., "4^28105")
+ * @returns Numeric part (e.g., 28105)
+ */
+export function extractNumericId(vectorId: string): number {
+  // Format is "4^XXXXX" - extract the number after ^
+  const parts = vectorId.split('^');
+  if (parts.length >= 2) {
+    return parseInt(parts[1], 10);
+  }
+  // Fallback: try to parse the whole string
+  return parseInt(vectorId, 10);
+}
+
+/**
+ * Load schema from Excel file
+ *
+ * Reads nexsus_schema_v2_generated.xlsx and parses all rows into
+ * NexsusSchemaRow objects. Results are cached for performance.
+ *
+ * @param filePath - Optional path to Excel file (defaults to NEXSUS_CONFIG.EXCEL_FILE)
+ * @returns Array of parsed schema rows
+ */
+export function loadNexsusSchema(filePath?: string): NexsusSchemaRow[] {
+  // Return cached if available
+  if (schemaCache !== null) {
+    console.error(`[NexsusLoader] Using cached schema (${schemaCache.length} rows)`);
+    return schemaCache;
+  }
+
+  const excelPath = filePath || path.resolve(process.cwd(), NEXSUS_CONFIG.EXCEL_FILE);
+  console.error(`[NexsusLoader] Loading schema from: ${excelPath}`);
+
+  if (!fs.existsSync(excelPath)) {
+    console.error(`[NexsusLoader] Excel file not found: ${excelPath}`);
+    return [];
+  }
+
+  // Read Excel file
+  const workbook = XLSX.readFile(excelPath);
+
+  // Detect format and route to appropriate loader
+  const format = detectSchemaFormat(workbook);
+
+  let schemas: NexsusSchemaRow[];
+
+  if (format === 'v2') {
+    schemas = loadV2FormatSchema(workbook);
+  } else {
+    schemas = loadSimpleFormatSchema(workbook);
+  }
 
   // Cache results
   schemaCache = schemas;
