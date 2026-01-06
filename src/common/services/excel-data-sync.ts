@@ -37,6 +37,14 @@ import { buildDataUuidV2 } from '../utils/uuid-v2.js';
 import { extractFkValueBySchema } from '../utils/fk-value-extractor.js';
 import { upsertRelationship } from './knowledge-graph.js';
 import { ensureModelIndexes } from './index-service.js';
+import { loadSamplePayloadConfig } from './sample-payload-loader.js';
+import {
+  convertValue,
+  createConversionStats,
+  recordConversion,
+  formatConversionStats,
+  type ConversionStats,
+} from '../utils/type-converter.js';
 import type { PipelineDataPoint, PipelineField, RelationshipType } from '../types.js';
 
 // =============================================================================
@@ -84,6 +92,8 @@ export interface ExcelDataSyncResult {
     model_name: string;
     records_synced: number;
   }>;
+  /** Type conversion statistics */
+  conversionStats?: ConversionStats;
 }
 
 /**
@@ -183,11 +193,21 @@ function generateSemanticText(
 
 /**
  * Transform Excel records to Qdrant format
+ *
+ * Uses samples/SAMPLE_payload_config.xlsx to determine which fields
+ * should be included in the Qdrant payload.
+ *
+ * Applies schema-driven type conversion:
+ * - date/datetime → Unix timestamp (ms)
+ * - integer → number
+ * - float/monetary → number
+ * - boolean → true/false
  */
 async function transformRecords(
   records: Array<Record<string, unknown>>,
   modelName: string,
-  modelId: number
+  modelId: number,
+  conversionStats: ConversionStats
 ): Promise<TransformedRecord[]> {
   // Get schema fields for this model
   const schemaFields = await getModelFieldsFromSchema(modelName);
@@ -195,6 +215,31 @@ async function transformRecords(
   if (!schemaFields || schemaFields.length === 0) {
     throw new Error(`No schema fields found for model: ${modelName}`);
   }
+
+  // Load payload config from samples/SAMPLE_payload_config.xlsx
+  const payloadConfig = loadSamplePayloadConfig();
+
+  // Filter schema fields to only those with payload=1 in config
+  const payloadFields = schemaFields.filter(field => {
+    const key = `${modelName}.${field.field_name}`;
+    return payloadConfig.get(key)?.include_in_payload === true;
+  });
+
+  // Warn if no payload config found for this model (fallback to all fields)
+  if (payloadFields.length === 0) {
+    console.error(chalk.yellow(
+      `[ExcelDataSync] WARNING: No payload config for '${modelName}'. ` +
+      `Add to samples/SAMPLE_payload_config.xlsx to control which fields are stored.`
+    ));
+  } else {
+    console.error(chalk.gray(
+      `[ExcelDataSync] Using ${payloadFields.length} payload fields from config ` +
+      `(out of ${schemaFields.length} total fields)`
+    ));
+  }
+
+  // Use configured payload fields, or fallback to all schema fields
+  const fieldsForPayload = payloadFields.length > 0 ? payloadFields : schemaFields;
 
   const transformed: TransformedRecord[] = [];
 
@@ -205,19 +250,29 @@ async function transformRecords(
       continue;
     }
 
-    // Generate semantic text for embedding
+    // Generate semantic text for embedding (uses ALL schema fields for rich embeddings)
     const vectorText = generateSemanticText(record, modelName, schemaFields);
 
-    // Build payload (include all record fields)
+    // Build payload using ONLY configured payload fields
+    // Apply schema-driven type conversion based on field_type
     const payload: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(record)) {
-      if (value !== null && value !== undefined) {
-        payload[key] = value;
+    for (const field of fieldsForPayload) {
+      const rawValue = record[field.field_name];
+
+      // Apply type conversion based on schema field_type
+      const conversion = convertValue(rawValue, field.field_type, field.field_name);
+
+      // Record conversion in stats
+      recordConversion(conversionStats, field.field_type, conversion, field.field_name);
+
+      // Store converted value (null values are not stored in Qdrant payload)
+      if (conversion.value !== null && conversion.value !== undefined) {
+        payload[field.field_name] = conversion.value;
       }
     }
 
-    // Add FK Qdrant UUIDs for many2one fields (using schema-driven extraction)
-    for (const field of schemaFields) {
+    // Add FK Qdrant UUIDs for many2one fields in payload (for graph traversal)
+    for (const field of fieldsForPayload) {
       if (field.field_type === 'many2one' && field.fk_location_model_id) {
         // Use schema-driven FK extraction (supports scalar, tuple, and expanded formats)
         const fkResult = extractFkValueBySchema(record, {
@@ -477,8 +532,9 @@ export async function syncExcelData(
     };
   }
 
-  // Transform records
-  const transformed = await transformRecords(records, modelName, modelId);
+  // Transform records with schema-driven type conversion
+  const conversionStats = createConversionStats();
+  const transformed = await transformRecords(records, modelName, modelId, conversionStats);
   console.error(chalk.gray(`[ExcelDataSync] Transformed ${transformed.length} records`));
 
   // Embed and upload in batches
@@ -543,10 +599,22 @@ export async function syncExcelData(
       console.error(chalk.green(`[ExcelDataSync] Created ${graphResult.edges_created} graph edges`));
     }
 
-    // Ensure payload indexes exist (automatic - no config needed)
-    const indexResult = await ensureModelIndexes(modelName, schemaFields);
+    // Get payload fields from config for index creation
+    const payloadConfig = loadSamplePayloadConfig();
+    const payloadFields = schemaFields.filter(field => {
+      const key = `${modelName}.${field.field_name}`;
+      return payloadConfig.get(key)?.include_in_payload === true;
+    });
+
+    // Use payload fields for indexing, or fallback to all schema fields
+    const fieldsToIndex = payloadFields.length > 0 ? payloadFields : schemaFields;
+
+    // Ensure payload indexes exist for the fields we're actually storing
+    const indexResult = await ensureModelIndexes(modelName, fieldsToIndex);
     if (indexResult.created > 0) {
-      console.error(chalk.green(`[ExcelDataSync] Created ${indexResult.created} indexes`));
+      console.error(chalk.green(
+        `[ExcelDataSync] Created ${indexResult.created} indexes for ${fieldsToIndex.length} payload fields`
+      ));
     }
   }
 
@@ -595,6 +663,7 @@ export async function syncExcelData(
     duration_ms: Date.now() - startTime,
     errors,
     cascaded_models: cascadedModels.length > 0 ? cascadedModels : undefined,
+    conversionStats,
   };
 
   // Summary
@@ -604,8 +673,39 @@ export async function syncExcelData(
   console.error(chalk.white(`  Records: ${recordsSynced} synced, ${recordsFailed} failed`));
   console.error(chalk.white(`  Duration: ${result.duration_ms}ms`));
 
+  // Type conversion report
+  if (conversionStats.totalFields > 0) {
+    console.error(chalk.blue(`\n[ExcelDataSync] Type Conversion Report`));
+    console.error(chalk.white(`  Total fields: ${conversionStats.totalFields}`));
+    console.error(chalk.green(`  Successful: ${conversionStats.successfulConversions}`));
+    if (conversionStats.failedConversions > 0) {
+      console.error(chalk.red(`  Failed: ${conversionStats.failedConversions}`));
+    }
+    if (conversionStats.nullValues > 0) {
+      console.error(chalk.gray(`  Null values: ${conversionStats.nullValues}`));
+    }
+
+    // Show breakdown by type
+    const typesWithConversions = Object.entries(conversionStats.byType)
+      .filter(([type]) => ['date', 'datetime', 'integer', 'float', 'monetary', 'boolean'].includes(type));
+    if (typesWithConversions.length > 0) {
+      console.error(chalk.gray(`  By type:`));
+      for (const [type, counts] of typesWithConversions) {
+        console.error(chalk.gray(`    ${type}: ${counts.success} ok, ${counts.failed} failed`));
+      }
+    }
+
+    // Show sample errors
+    if (conversionStats.errors.length > 0) {
+      console.error(chalk.yellow(`  Sample errors:`));
+      for (const err of conversionStats.errors.slice(0, 5)) {
+        console.error(chalk.yellow(`    - ${err.field}: "${err.value}" → ${err.error}`));
+      }
+    }
+  }
+
   if (cascadedModels.length > 0) {
-    console.error(chalk.white(`  Cascaded:`));
+    console.error(chalk.white(`\n  Cascaded:`));
     for (const cm of cascadedModels) {
       console.error(chalk.gray(`    - ${cm.model_name}: ${cm.records_synced} records`));
     }

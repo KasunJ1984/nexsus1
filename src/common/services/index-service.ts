@@ -18,22 +18,40 @@ import type { PipelineField } from '../types.js';
 import chalk from 'chalk';
 
 /**
- * Map Odoo field types to Qdrant index types
+ * Map field types to Qdrant index types
  *
- * @param fieldType - Odoo field type (char, integer, many2one, etc.)
+ * Schema-driven type mapping:
+ * - date/datetime → integer (stored as Unix timestamps in milliseconds)
+ * - integer → integer
+ * - float/monetary → float
+ * - boolean → bool
+ * - others (char, text, selection, many2one) → keyword
+ *
+ * @param fieldType - Field type from schema (char, integer, date, many2one, etc.)
  * @returns Qdrant index schema type
  */
 function getQdrantIndexType(fieldType: string): 'keyword' | 'integer' | 'float' | 'bool' {
   switch (fieldType.toLowerCase()) {
+    // Integer types
     case 'integer':
       return 'integer';
+
+    // Date types stored as Unix timestamps (milliseconds)
+    case 'date':
+    case 'datetime':
+      return 'integer';
+
+    // Float types
     case 'float':
     case 'monetary':
       return 'float';
+
+    // Boolean type
     case 'boolean':
       return 'bool';
+
     default:
-      // char, text, selection, many2one, date, datetime, etc. → keyword
+      // char, text, selection, many2one, etc. → keyword
       return 'keyword';
   }
 }
