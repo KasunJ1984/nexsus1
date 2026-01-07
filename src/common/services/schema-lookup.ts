@@ -970,6 +970,19 @@ export const INDEXED_FIELDS = new Set([
   // === Excel data fields (master model - Chart of Accounts) ===
   'Id',                     // Primary key in master model
   'Gllinkname',             // GL account name/link
+  'EBITA',                  // EBITDA flag (Y/N)
+  'Type2',                  // Statement type: BS (Balance Sheet) or PL (Profit & Loss)
+  'F1_des',                 // F1 description
+  'DCFL_6',                 // DCFL classification
+
+  // === Additional Excel fields (for complete coverage) ===
+  'Account_id_id',          // FK reference to master (integer ID)
+  'id',                     // Generic ID field (lowercase)
+  // NOTE: Fields with special characters cannot be indexed in Qdrant:
+  // - 'Master[EBITA]' - brackets not allowed in index names
+  // - 'Account Name' - spaces not allowed in index names
+  // These fields ARE in payload but validation will reject filter queries on them.
+  // Users should use semantic_search for these fields instead.
 ]);
 
 /**

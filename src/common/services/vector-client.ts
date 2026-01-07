@@ -1508,6 +1508,18 @@ const UNIFIED_INDEXES: Array<{ field: string; type: 'keyword' | 'integer' | 'flo
   // === Excel data fields (master model - Chart of Accounts) ===
   { field: 'Id', type: 'integer' },             // Primary key in master model
   { field: 'Gllinkname', type: 'keyword' },     // GL account name/link
+  { field: 'EBITA', type: 'keyword' },          // EBITDA flag (Y/N)
+  { field: 'Type2', type: 'keyword' },          // Statement type: BS or PL
+  { field: 'F1_des', type: 'keyword' },         // F1 description
+  { field: 'DCFL_6', type: 'keyword' },         // DCFL classification
+
+  // === Additional Excel fields (for complete coverage) ===
+  { field: 'Account_id_id', type: 'integer' },  // FK reference to master (integer ID)
+  { field: 'id', type: 'integer' },             // Generic ID field (lowercase)
+  // NOTE: Fields with special characters cannot be indexed in Qdrant:
+  // - 'Master[EBITA]' - brackets not allowed
+  // - 'Account Name' - spaces not allowed
+  // These fields can still be stored in payload but not filtered efficiently
 
   // === Legacy Odoo fields (kept for backward compatibility) ===
   // ir.actions.act_window fields (for build_odoo_url tool)

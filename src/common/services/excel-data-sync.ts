@@ -38,6 +38,7 @@ import { extractFkValueBySchema } from '../utils/fk-value-extractor.js';
 import { upsertRelationship } from './knowledge-graph.js';
 import { ensureModelIndexes } from './index-service.js';
 import { loadSamplePayloadConfig } from './sample-payload-loader.js';
+import { registerIndexedFields } from './schema-lookup.js';
 import {
   convertValue,
   createConversionStats,
@@ -616,6 +617,18 @@ export async function syncExcelData(
         `[ExcelDataSync] Created ${indexResult.created} indexes for ${fieldsToIndex.length} payload fields`
       ));
     }
+
+    // Register fields for immediate filtering (sync with INDEXED_FIELDS validation registry)
+    const indexedFieldNames: string[] = [];
+    for (const f of fieldsToIndex) {
+      indexedFieldNames.push(f.field_name);
+      // For many2one fields, also register the _id and _qdrant variants
+      if (f.field_type === 'many2one') {
+        indexedFieldNames.push(`${f.field_name}_id`);
+        indexedFieldNames.push(`${f.field_name}_qdrant`);
+      }
+    }
+    registerIndexedFields(indexedFieldNames);
   }
 
   // FK Cascade (if not skipped)
