@@ -1,5 +1,14 @@
 # semantic_search Guidelines
 
+## Nexsus1 Available Models
+
+This is a standalone Excel-based system with only these models:
+- `master` - Chart of Accounts (~560 GL accounts with classifications)
+- `actual` - Monthly financial actuals (~15,000 transactions)
+- `schema` - Field definitions (metadata only)
+
+**FK Relationship**: `actual.Account_id → master.id`
+
 ## When to Use
 - Discovery: Finding entities, IDs, and context from natural language
 - Fuzzy matching: When user provides partial names or descriptions
@@ -17,9 +26,9 @@
 
 | Parameter | Purpose | Example |
 |-----------|---------|---------|
-| `query` | Natural language search text | `"hospital projects in Victoria"` |
+| `query` | Natural language search text | `"revenue accounts"` |
 | `point_type` | What to search | `"data"`, `"schema"`, `"all"` |
-| `model_filter` | Limit to specific model | `"crm.lead"`, `"res.partner"` |
+| `model_filter` | Limit to specific model | `"actual"`, `"master"` |
 | `limit` | Max results to return | `10` (default), up to `200` |
 | `min_similarity` | Score threshold 0-1 | `0.35` (default) |
 | `graph_boost` | Boost well-connected records | `true` for ranked results |
@@ -36,6 +45,8 @@
 
 5. **Missing model_filter** -> Without it, searches all synced models; filter for efficiency
 
+6. **Wrong model names** -> Use `actual` not `account.move.line`, use `master` not `res.partner`
+
 ## Verification Steps
 
 Before using results for nexsus_search:
@@ -48,7 +59,7 @@ Before using results for nexsus_search:
 
 | User Intent | Use point_type |
 |-------------|----------------|
-| Find a partner/lead/record | `"data"` |
+| Find a GL account/transaction | `"data"` |
 | What fields exist on a model | `"schema"` |
 | Both field info and records | `"all"` |
 
@@ -57,22 +68,46 @@ Before using results for nexsus_search:
 Enable `graph_boost: true` when:
 - Looking for "main" or "important" records
 - Records with many relationships are more relevant
-- Searching partners or leads that are well-referenced
+- Searching accounts that are heavily used in transactions
 
 ## Example Workflow
 
 ```
-User: "Show me the Wadsworth account transactions"
+User: "Show me the cash account transactions"
 
 1. semantic_search:
-   query: "Wadsworth"
+   query: "cash account"
    point_type: "data"
-   model_filter: "res.partner"
+   model_filter: "master"
    graph_boost: true
 
-2. Results show: Wadsworth Painting (id: 286798, score: 0.92)
+2. Results show: Cash on Hand (id: 10100, score: 0.92)
 
-3. Use partner_id_id: 286798 in nexsus_search filters
+3. Use Account_id: 10100 in nexsus_search filters
+```
+
+## Example: Finding Revenue Accounts
+```
+User: "What revenue accounts do we have?"
+
+semantic_search:
+  query: "revenue accounts"
+  point_type: "data"
+  model_filter: "master"
+
+Results will return accounts where F1="REV" with high scores.
+```
+
+## Example: Schema Discovery
+```
+User: "What fields are available on the actual model?"
+
+semantic_search:
+  query: "actual model fields"
+  point_type: "schema"
+  model_filter: "actual"
+
+Results will show: id, Account_id, Month, Entity, Classification, Amount
 ```
 
 ## Related Tools
