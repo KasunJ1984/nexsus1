@@ -141,9 +141,9 @@ Natural language search across synced data. Use for **discovery** - finding enti
 
 ```json
 {
-  "query": "partners",
+  "query": "revenue accounts",
   "point_type": "data",
-  "model_filter": "res.partner",
+  "model_filter": "master",
   "graph_boost": true
 }
 ```
@@ -164,8 +164,8 @@ Navigate FK relationships in the knowledge graph.
 
 ```json
 {
-  "model_name": "res.partner",
-  "record_id": 286798,
+  "model_name": "master",
+  "record_id": 10100,
   "direction": "both",
   "depth": 1,
   "incoming_limit": 50
@@ -177,8 +177,8 @@ Find records similar to a reference record within the same model.
 
 ```json
 {
-  "model_name": "crm.lead",
-  "record_id": 12345,
+  "model_name": "master",
+  "record_id": 10100,
   "limit": 5,
   "min_similarity": 0.7
 }
