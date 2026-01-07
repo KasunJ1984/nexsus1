@@ -46,6 +46,60 @@ export function isVectorClientAvailable(): boolean {
 }
 
 /**
+ * Validate Qdrant connection is healthy
+ *
+ * Actually attempts to communicate with Qdrant to verify the connection works.
+ * Returns detailed status for diagnostic purposes.
+ *
+ * @returns Object with health status and details
+ */
+export async function validateQdrantConnection(): Promise<{
+  healthy: boolean;
+  clientInitialized: boolean;
+  canConnect: boolean;
+  collectionExists: boolean;
+  collectionName: string;
+  host: string;
+  error?: string;
+}> {
+  const result = {
+    healthy: false,
+    clientInitialized: qdrantClient !== null,
+    canConnect: false,
+    collectionExists: false,
+    collectionName: UNIFIED_CONFIG.COLLECTION_NAME,
+    host: QDRANT_CONFIG.HOST,
+    error: undefined as string | undefined,
+  };
+
+  if (!qdrantClient) {
+    result.error = 'Qdrant client not initialized. Check QDRANT_HOST and QDRANT_API_KEY.';
+    return result;
+  }
+
+  try {
+    // Try to list collections - this validates the connection
+    const collections = await qdrantClient.getCollections();
+    result.canConnect = true;
+
+    // Check if our collection exists
+    result.collectionExists = collections.collections.some(
+      c => c.name === UNIFIED_CONFIG.COLLECTION_NAME
+    );
+
+    if (!result.collectionExists) {
+      result.error = `Collection '${UNIFIED_CONFIG.COLLECTION_NAME}' not found. Run 'npm run sync -- sync schema' first.`;
+    }
+
+    result.healthy = result.canConnect && result.collectionExists;
+    return result;
+  } catch (error) {
+    result.error = error instanceof Error ? error.message : String(error);
+    return result;
+  }
+}
+
+/**
  * Get the raw Qdrant client (for advanced operations)
  */
 export function getQdrantClient(): QdrantClient {

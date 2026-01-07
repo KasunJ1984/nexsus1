@@ -30,8 +30,8 @@ import { registerInspectGraphEdgeTool } from '../common/tools/inspect-graph-edge
 import { registerBlendthinkDiagnoseTool } from './blendthink/tools/diagnose-tool.js';
 import { registerBlendthinkExecuteTool } from './blendthink/tools/execute-tool.js';
 import { initializeConversationMemory, shutdownConversationMemory } from './blendthink/conversation-memory.js';
-import { initializeEmbeddingService } from '../common/services/embedding-service.js';
-import { initializeVectorClient } from '../common/services/vector-client.js';
+import { initializeEmbeddingService, isEmbeddingServiceAvailable } from '../common/services/embedding-service.js';
+import { initializeVectorClient, validateQdrantConnection, isVectorClientAvailable } from '../common/services/vector-client.js';
 import { getSchemaStats } from '../common/services/schema-loader.js';
 import { initializeSchemaLookup } from '../common/services/schema-lookup.js';
 import {
@@ -189,59 +189,138 @@ async function runHttp(): Promise<void> {
 // SERVICE INITIALIZATION
 // =============================================================================
 
+/**
+ * Service initialization status for health reporting
+ */
+interface ServiceStatus {
+  embedding: { ready: boolean; error?: string };
+  qdrant: { ready: boolean; canConnect: boolean; collectionExists: boolean; error?: string };
+  schema: { ready: boolean; error?: string };
+}
+
+// Global service status for health check tool
+let serviceStatus: ServiceStatus = {
+  embedding: { ready: false },
+  qdrant: { ready: false, canConnect: false, collectionExists: false },
+  schema: { ready: false },
+};
+
+/**
+ * Get current service status for health checks
+ */
+export function getServiceStatus(): ServiceStatus {
+  return serviceStatus;
+}
+
 async function initializeServices(): Promise<void> {
   console.error('[Init] Initializing services...');
+  console.error('[Init] ========================================');
+
+  // Check critical environment variables upfront
+  const envWarnings: string[] = [];
+  if (!process.env.VOYAGE_API_KEY) {
+    envWarnings.push('VOYAGE_API_KEY not set - embedding/search will fail');
+  }
+  if (!process.env.QDRANT_HOST) {
+    envWarnings.push('QDRANT_HOST not set - using default localhost:6333');
+  }
+
+  if (envWarnings.length > 0) {
+    console.error('[Init] ⚠️  ENVIRONMENT WARNINGS:');
+    envWarnings.forEach(w => console.error(`[Init]    - ${w}`));
+    console.error('[Init] ----------------------------------------');
+  }
 
   // 1. Initialize embedding service (Voyage AI)
   const embeddingReady = initializeEmbeddingService();
+  serviceStatus.embedding.ready = embeddingReady;
   if (!embeddingReady) {
-    console.error('[Init] Warning: Embedding service not available. Set VOYAGE_API_KEY.');
+    serviceStatus.embedding.error = 'VOYAGE_API_KEY not set or invalid';
+    console.error('[Init] ❌ Embedding service FAILED - Set VOYAGE_API_KEY');
   } else {
-    console.error('[Init] Embedding service ready');
+    console.error('[Init] ✓ Embedding service ready (Voyage AI)');
   }
 
   // 2. Initialize vector client (Qdrant)
   const vectorReady = initializeVectorClient();
   if (!vectorReady) {
-    console.error('[Init] Warning: Vector client not available. Check QDRANT_HOST.');
+    serviceStatus.qdrant.error = 'Failed to create Qdrant client - check QDRANT_HOST';
+    console.error('[Init] ❌ Vector client FAILED - Check QDRANT_HOST');
   } else {
-    console.error('[Init] Vector client ready');
+    console.error('[Init] ✓ Vector client initialized');
+
+    // 2b. Validate Qdrant connection (actually try to connect)
+    const qdrantValidation = await validateQdrantConnection();
+    serviceStatus.qdrant = {
+      ready: qdrantValidation.healthy,
+      canConnect: qdrantValidation.canConnect,
+      collectionExists: qdrantValidation.collectionExists,
+      error: qdrantValidation.error,
+    };
+
+    if (qdrantValidation.healthy) {
+      console.error(`[Init] ✓ Qdrant connection healthy (${qdrantValidation.host})`);
+      console.error(`[Init] ✓ Collection '${qdrantValidation.collectionName}' exists`);
+    } else if (qdrantValidation.canConnect && !qdrantValidation.collectionExists) {
+      console.error(`[Init] ⚠️  Qdrant connected but collection not found`);
+      console.error(`[Init]    Run: npm run sync -- sync schema`);
+    } else {
+      console.error(`[Init] ❌ Qdrant connection FAILED: ${qdrantValidation.error}`);
+    }
   }
 
   // 3. Initialize schema lookup for query validation
   try {
     initializeSchemaLookup();
-    console.error('[Init] Schema lookup initialized for query validation');
+    serviceStatus.schema.ready = true;
+    console.error('[Init] ✓ Schema lookup initialized');
   } catch (err) {
-    console.error('[Init] Schema lookup deferred - will initialize on first query');
+    const errMsg = err instanceof Error ? err.message : String(err);
+    serviceStatus.schema.error = errMsg;
+    console.error('[Init] ⚠️  Schema lookup deferred - will initialize on first query');
   }
 
   // 4. Initialize NEXUS Analytics (Self-Improving System)
-  // Creates a schema hash based on field count to detect changes
   try {
     const stats = getSchemaStats();
     const schemaHash = `v1-${stats.totalFields}-${stats.models}`;
     initializeAnalytics(schemaHash);
-    console.error(`[Init] NEXUS Analytics initialized (schema hash: ${schemaHash})`);
+    console.error(`[Init] ✓ Analytics initialized (schema: ${schemaHash})`);
   } catch (err) {
-    console.error('[Init] Analytics init skipped - schema not loaded yet');
+    console.error('[Init] ⚠️  Analytics deferred - schema not loaded');
   }
 
-  // 5. Initialize Training Data Collection (Phase 2 Preparation)
+  // 5. Initialize Training Data Collection
   initializeTrainingData();
-  console.error('[Init] Training data collection initialized');
+  console.error('[Init] ✓ Training data collection ready');
 
   // 6. Initialize Blendthink Conversation Memory
   try {
     initializeConversationMemory();
-    console.error('[Init] Blendthink conversation memory initialized');
+    console.error('[Init] ✓ Conversation memory ready');
   } catch (err) {
-    console.error('[Init] Conversation memory init failed:', err);
+    console.error('[Init] ⚠️  Conversation memory init failed:', err);
   }
 
-  // Note: Schema collection is initialized via the 'sync' tool
-  // Use sync with action="full_sync" to upload schema data
-  console.error('[Init] Use sync tool with action="full_sync" to upload schema');
+  // Summary
+  console.error('[Init] ========================================');
+  const criticalOk = serviceStatus.embedding.ready && serviceStatus.qdrant.ready;
+  if (criticalOk) {
+    console.error('[Init] ✓ All critical services ready');
+  } else {
+    console.error('[Init] ⚠️  SOME SERVICES NOT READY - Tools may fail!');
+    if (!serviceStatus.embedding.ready) {
+      console.error('[Init]    → Fix: Set VOYAGE_API_KEY environment variable');
+    }
+    if (!serviceStatus.qdrant.ready) {
+      if (!serviceStatus.qdrant.canConnect) {
+        console.error('[Init]    → Fix: Check QDRANT_HOST is reachable');
+      } else if (!serviceStatus.qdrant.collectionExists) {
+        console.error('[Init]    → Fix: Run "npm run sync -- sync schema" to create collection');
+      }
+    }
+  }
+  console.error('[Init] ========================================');
 }
 
 // =============================================================================
