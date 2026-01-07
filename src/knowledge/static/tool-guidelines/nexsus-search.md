@@ -35,34 +35,36 @@ This is a standalone Excel-based system with only these models:
 ## Nexsus1 Field Reference
 
 ### actual model (Monthly Actuals)
-| Field | Type | Description |
-|-------|------|-------------|
-| `id` | integer | Row identifier |
-| `Account_id` | integer | FK to master.id (GL account) |
-| `Month` | date | Accounting period (Excel serial date) |
-| `Entity` | string | Business segment: Product, Installation, Freight, Other |
-| `Classification` | string | Account classification code |
-| `Amount` | float | Net amount (positive=debit, negative=credit) |
+| Field | Type | Description | Indexed |
+|-------|------|-------------|---------|
+| `id` | integer | Row identifier | Yes |
+| `Account_id` | integer | FK to master.id (GL account) | Yes |
+| `Month` | integer | Accounting period (Unix timestamp ms from Excel serial date) | Yes |
+| `Entity` | string | Business segment: Product, Installation, Freight, Other | Yes |
+| `F1` | string | Level 1 classification: REV, VCOS, FCOS, OH | Yes |
+| `Amount` | float | Net amount (positive=debit, negative=credit) | Yes |
+
+**Note**: Use `F1` for classification filtering. The field `Classification` may not exist in all schemas - check your specific data.
 
 ### master model (Chart of Accounts)
-| Field | Type | Description |
-|-------|------|-------------|
-| `id` | integer | GL account code (10000-99999) |
-| `Gllinkname` | string | Full account name with code |
-| `Type2` | string | Statement type: BS (Balance Sheet) or PL (Profit & Loss) |
-| `F1` | string | Level 1 P&L code: REV, VCOS, FCOS, OH, CASH, etc. |
-| `F1_des` | string | F1 description |
-| `Entity` | string | Business segment |
-| `EBITA` | string | Y/N - Include in EBITA calculations |
+| Field | Type | Description | Indexed |
+|-------|------|-------------|---------|
+| `Id` | integer | GL account code (10000-99999) | Yes |
+| `Gllinkname` | string | Full account name with code | Yes |
+| `Type2` | string | Statement type: BS (Balance Sheet) or PL (Profit & Loss) | No |
+| `F1` | string | Level 1 P&L code: REV, VCOS, FCOS, OH, CASH, etc. | Yes |
+| `F1_des` | string | F1 description | No |
+| `Entity` | string | Business segment | Yes |
+| `EBITA` | string | Y/N - Include in EBITA calculations | No |
 
 ## Common Query Patterns
 
-### Total Amount by Classification
+### Total Amount by F1 Classification
 ```json
 {
   "model_name": "actual",
   "aggregations": [{"field": "Amount", "op": "sum", "alias": "total"}],
-  "group_by": ["Classification"]
+  "group_by": ["F1"]
 }
 ```
 

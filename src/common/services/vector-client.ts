@@ -1496,10 +1496,24 @@ const UNIFIED_INDEXES: Array<{ field: string; type: 'keyword' | 'integer' | 'flo
   // === Data-specific indexes (point_type: 'data') ===
   { field: 'record_id', type: 'integer' },
 
+  // === Excel data fields (actual model - DuraCube financial data) ===
+  { field: 'Month', type: 'integer' },          // Excel serial date as Unix timestamp (ms)
+  { field: 'Amount', type: 'float' },           // Transaction amount (debit positive, credit negative)
+  { field: 'Entity', type: 'keyword' },         // Business segment: Product, Installation, Freight, Other
+  { field: 'F1', type: 'keyword' },             // Level 1 classification: REV, VCOS, FCOS, OH
+  { field: 'Classification', type: 'keyword' }, // Full account type (if present in schema)
+  { field: 'Account_id', type: 'integer' },     // FK to master model (account ID)
+  { field: 'Account_id_qdrant', type: 'keyword' }, // FK Qdrant reference for graph traversal
+
+  // === Excel data fields (master model - Chart of Accounts) ===
+  { field: 'Id', type: 'integer' },             // Primary key in master model
+  { field: 'Gllinkname', type: 'keyword' },     // GL account name/link
+
+  // === Legacy Odoo fields (kept for backward compatibility) ===
   // ir.actions.act_window fields (for build_odoo_url tool)
   { field: 'res_model', type: 'keyword' },
 
-  // account.move.line fields
+  // account.move.line fields (Odoo)
   { field: 'account_id_id', type: 'integer' },
   { field: 'date', type: 'keyword' },
   { field: 'parent_state', type: 'keyword' },
@@ -1510,7 +1524,7 @@ const UNIFIED_INDEXES: Array<{ field: string; type: 'keyword' | 'integer' | 'flo
   { field: 'credit', type: 'float' },
   { field: 'balance', type: 'float' },
 
-  // crm.lead fields
+  // crm.lead fields (Odoo)
   { field: 'stage_id_id', type: 'integer' },
   { field: 'user_id_id', type: 'integer' },
   { field: 'team_id_id', type: 'integer' },
@@ -1521,7 +1535,7 @@ const UNIFIED_INDEXES: Array<{ field: string; type: 'keyword' | 'integer' | 'flo
   { field: 'opportunity_type', type: 'keyword' },
   { field: 'create_date', type: 'keyword' },
 
-  // res.partner (contact) fields
+  // res.partner (contact) fields (Odoo)
   { field: 'is_company', type: 'bool' },
   { field: 'customer_rank', type: 'integer' },
   { field: 'supplier_rank', type: 'integer' },
