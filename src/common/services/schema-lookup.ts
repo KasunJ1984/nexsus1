@@ -956,6 +956,20 @@ export const INDEXED_FIELDS = new Set([
 
   // Graph-specific indexes
   'source_model', 'target_model', 'is_leaf',
+
+  // === Excel data fields (actual model - DuraCube financial data) ===
+  // IMPORTANT: Keep in sync with UNIFIED_INDEXES in vector-client.ts
+  'Month',                  // Excel serial date as Unix timestamp (ms)
+  'Amount',                 // Transaction amount (debit positive, credit negative)
+  'Entity',                 // Business segment: Product, Installation, Freight, Other
+  'F1',                     // Level 1 classification: REV, VCOS, FCOS, OH
+  'Classification',         // Full account type (if present in schema)
+  'Account_id',             // FK to master model (account ID)
+  'Account_id_qdrant',      // FK Qdrant reference for graph traversal
+
+  // === Excel data fields (master model - Chart of Accounts) ===
+  'Id',                     // Primary key in master model
+  'Gllinkname',             // GL account name/link
 ]);
 
 /**
