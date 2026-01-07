@@ -832,16 +832,24 @@ export interface SimpleSchemaRow {
   /** "Yes" or "No" - indicates if field is stored in database */
   Stored: string;
 
-  /** For FK fields: Target model name (e.g., "country") */
+  /** For FK fields: Target model name (e.g., "country") - underscore format preferred */
+  'FK_location_field_model'?: string;
+  /** @deprecated Use FK_location_field_model instead */
   'FK location field model'?: string;
 
   /** For FK fields: Target model ID (e.g., 2) - CRITICAL for graph edges */
+  'FK_location_field_model_id'?: number;
+  /** @deprecated Use FK_location_field_model_id instead */
   'FK location field model id'?: number;
 
-  /** For FK fields: Target field ID (e.g., 201 for id field) - CRITICAL for graph edges */
+  /** For FK fields: Target field ID (e.g., 201) - CRITICAL for graph edges */
+  'FK_location_record_Id'?: number;
+  /** @deprecated Use FK_location_record_Id instead */
   'FK location record Id'?: number;
 
-  /** For FK fields: Auto-generated Qdrant UUID reference (optional in user input) */
+  /** For FK fields: Auto-generated Qdrant UUID reference */
+  'Qdrant_ID_for_FK'?: string;
+  /** @deprecated Use Qdrant_ID_for_FK instead */
   'Qdrant ID for FK'?: string;
 }
 

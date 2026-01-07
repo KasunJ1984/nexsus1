@@ -1,0 +1,36 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls:*)",
+      "Bash(node -e:*)",
+      "Bash(dir:*)",
+      "Bash(git add:*)",
+      "Bash(npm run build:*)",
+      "Bash(node scripts/update-schema-with-knowledge.cjs:*)",
+      "Bash(npm run sync:*)",
+      "Bash(CLAUDE.md )",
+      "Bash(samples/Nexsus1_schema.xlsx )",
+      "Bash(samples/SAMPLE_payload_config.xlsx )",
+      "Bash(src/common/services/simple-schema-converter.ts )",
+      "Bash(src/common/types.ts )",
+      "Bash(src/console/sync/index.ts )",
+      "Bash(src/knowledge/adapter/knowledge-adapter.ts )",
+      "Bash(src/knowledge/dynamic/loaders/index.ts )",
+      "Bash(src/knowledge/dynamic/loaders/excel-knowledge-loader.ts )",
+      "Bash(src/knowledge/dynamic/loaders/extended-knowledge-sync.ts )",
+      "Bash(src/knowledge/dynamic/loaders/knowledge-point-builder.ts )",
+      "Bash(src/knowledge/dynamic/schemas/index.ts )",
+      "Bash(src/knowledge/dynamic/schemas/field-knowledge-schema.ts )",
+      "Bash(src/knowledge/dynamic/schemas/instance-config-schema.ts )",
+      "Bash(src/knowledge/dynamic/schemas/model-metadata-schema.ts )",
+      "Bash(scripts/update-schema-with-knowledge.cjs )",
+      "Bash(docs/plans/dynamic-knowledge-template.md)",
+      "Bash(git commit:*)",
+      "Bash(npm ls:*)"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "nexsus1"
+  ]
+}

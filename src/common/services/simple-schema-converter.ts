@@ -6,8 +6,8 @@
  * Supports two schema formats:
  * 1. Simple Format (11 columns - backward compatible):
  *    - Field_ID, Model_ID, Field_Name, Field_Label, Field_Type, Model_Name,
- *      Stored, FK location field model, FK location field model id, FK location record Id,
- *      Qdrant ID for FK
+ *      Stored, FK_location_field_model, FK_location_field_model_id, FK_location_record_Id,
+ *      Qdrant_ID_for_FK
  *
  * 2. Extended Format (17 columns - with Level 4 Knowledge):
  *    - All 11 Simple columns PLUS:
@@ -20,7 +20,7 @@
  * - Auto-generated V2 UUIDs
  * - FK metadata preserved for knowledge graph construction
  *
- * CRITICAL: FK metadata (FK location field model id, FK location record Id) must be
+ * CRITICAL: FK metadata (FK_location_field_model_id, FK_location_record_Id) must be
  * preserved in both semantic_text and raw_payload to enable knowledge graph edge creation.
  *
  * BACKWARD COMPATIBILITY: New Level 4 columns are optional. Schema files without
@@ -40,16 +40,31 @@ export interface ValidationResult {
 }
 
 /**
- * Helper function to get FK metadata field, handling column names with/without leading spaces
+ * Canonical FK field names (with underscores - the preferred format)
+ */
+const FK_FIELD_MODEL = 'FK_location_field_model';
+const FK_FIELD_MODEL_ID = 'FK_location_field_model_id';
+const FK_FIELD_RECORD_ID = 'FK_location_record_Id';
+
+/**
+ * Helper function to get FK metadata field, handling multiple column name formats
  *
- * Excel sometimes adds leading spaces to column headers. This function tries both versions.
+ * Supports multiple naming conventions for backward compatibility:
+ * 1. Underscore format (preferred): "FK_location_field_model"
+ * 2. Space format (legacy): "FK location field model"
+ * 3. With leading space: " FK location field model"
  */
 function getFkField<T>(row: any, fieldName: string): T | undefined {
-  // Try exact match first
+  // Try underscore version first (preferred format)
+  const underscoreVersion = fieldName.replace(/ /g, '_');
+  if (row[underscoreVersion] !== undefined) {
+    return row[underscoreVersion] as T;
+  }
+  // Try exact match (space version - legacy)
   if (row[fieldName] !== undefined) {
     return row[fieldName] as T;
   }
-  // Try with leading space
+  // Try with leading space (legacy)
   if (row[` ${fieldName}`] !== undefined) {
     return row[` ${fieldName}`] as T;
   }
