@@ -1,5 +1,13 @@
 # Odoo URL Builder - Claude Guide
 
+> **PHASE 2 - ODOO INTEGRATION ONLY**
+>
+> This tool is NOT used in Nexsus1 standalone Excel mode.
+> It requires an active Odoo connection and synced Odoo menu/action models.
+> Skip this documentation if you're using the Excel-only version.
+
+---
+
 > **Tool:** `build_odoo_url`
 > **Purpose:** Generate clickable Odoo web URLs for direct navigation
 

@@ -4,6 +4,18 @@
 > **Tool:** `nexsus_search`
 > **Purpose:** Intelligent search workflow combining discovery with precise queries
 
+> **NOTE: Model Names**
+>
+> This guide was written for Odoo integration. For Nexsus1 standalone Excel mode:
+> - Replace `account.move.line` with `actual`
+> - Replace `res.partner` with `master`
+> - Replace `crm.lead`, `account.move`, etc. with appropriate Excel models
+> - The **workflow and concepts** remain the same - only model names differ.
+>
+> **Available Nexsus1 Models:** `master` (Chart of Accounts), `actual` (Monthly Actuals), `schema` (Field definitions)
+>
+> **FK Relationship:** `actual.Account_id → master.id`
+
 ---
 
 ## Overview
