@@ -672,6 +672,12 @@ export function validateExactQuery(
   // Validate GROUP BY fields
   if (groupBy && groupBy.length > 0) {
     for (const field of groupBy) {
+      // Skip _linked.* fields - they're resolved at runtime from linked records
+      // e.g., "_linked.Account_id.F1" groups by the F1 field from linked master records
+      if (field.startsWith('_linked.')) {
+        continue;
+      }
+
       const fieldInfo = getFieldInfo(modelName, field);
 
       if (!fieldInfo) {
