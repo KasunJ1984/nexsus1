@@ -386,7 +386,21 @@ function buildGroupKey(
   groupBy: string[]
 ): string {
   return groupBy.map(field => {
-    const value = payload[field];
+    let value: unknown;
+
+    // Handle linked field paths: "_linked.Account_id.F1"
+    if (field.startsWith('_linked.')) {
+      const parts = field.split('.');
+      // parts = ["_linked", "Account_id", "F1"]
+      const linkField = parts[1];  // "Account_id"
+      const targetField = parts[2]; // "F1"
+
+      const linked = payload._linked as Record<string, { data?: Record<string, unknown> }> | undefined;
+      value = linked?.[linkField]?.data?.[targetField];
+    } else {
+      value = payload[field];
+    }
+
     if (value === null || value === undefined) {
       return 'null';
     }
@@ -529,4 +543,119 @@ function passesAppFilters(
   }
 
   return true;
+}
+
+// =============================================================================
+// IN-MEMORY AGGREGATION (for pre-enriched records with _linked data)
+// =============================================================================
+
+/**
+ * Execute aggregation on pre-fetched, enriched records
+ *
+ * Used when GROUP BY includes linked fields (e.g., "_linked.Account_id.F1").
+ * Records must already be enriched with _linked data via enrichRecordsWithLinks().
+ *
+ * @param records - Pre-fetched records with _linked data
+ * @param aggregations - Array of aggregation definitions
+ * @param groupBy - Optional fields to group by (supports _linked.* paths)
+ * @returns AggregationResult with computed values
+ *
+ * @example
+ * ```typescript
+ * // Records already enriched with _linked data
+ * const enrichedRecords = enrichRecordsWithLinks(rawRecords, ['Account_id'], linkResult);
+ *
+ * // Now aggregate by linked field
+ * const result = executeInMemoryAggregation(enrichedRecords, [
+ *   { field: 'Amount', op: 'sum', alias: 'total' }
+ * ], ['_linked.Account_id.F1']);
+ * ```
+ */
+export function executeInMemoryAggregation(
+  records: Array<Record<string, unknown>>,
+  aggregations: Aggregation[],
+  groupBy?: string[]
+): AggregationResult {
+  // Initialize global accumulator (for non-grouped queries)
+  const globalState = createEmptyState(aggregations);
+
+  // Group accumulators (for GROUP BY queries)
+  const groupStates = new Map<string, AggregatorState>();
+
+  console.error(`[InMemoryAggregation] Processing ${records.length} enriched records, groupBy=${groupBy?.join(',') || 'none'}`);
+
+  // Process each pre-fetched record
+  for (const record of records) {
+    // Determine target state (global or group-specific)
+    let targetState: AggregatorState;
+
+    if (groupBy && groupBy.length > 0) {
+      // Build group key from field values (supports _linked.* paths)
+      const groupKey = buildGroupKey(record, groupBy);
+
+      // Get or create group state
+      if (!groupStates.has(groupKey)) {
+        groupStates.set(groupKey, createEmptyState(aggregations));
+      }
+      targetState = groupStates.get(groupKey)!;
+    } else {
+      targetState = globalState;
+    }
+
+    // Update accumulators for each aggregation
+    for (const agg of aggregations) {
+      const fieldValue = record[agg.field];
+      updateAccumulator(targetState, agg, fieldValue);
+    }
+  }
+
+  console.error(`[InMemoryAggregation] Complete: ${records.length} records, ${groupStates.size} groups`);
+
+  // Compute final results
+  const results = computeFinalResults(globalState, aggregations);
+
+  // Compute group results if grouped
+  let groups: Array<{ key: Record<string, unknown>; values: Record<string, number> }> | undefined;
+
+  if (groupBy && groupBy.length > 0 && groupStates.size > 0) {
+    groups = [];
+    for (const [keyStr, groupState] of groupStates) {
+      // Parse key back to object
+      const key = parseGroupKey(keyStr, groupBy);
+      const values = computeFinalResults(groupState, aggregations);
+      groups.push({ key, values });
+    }
+
+    // Sort groups by first group-by field
+    groups.sort((a, b) => {
+      const aVal = String(a.key[groupBy[0]] ?? '');
+      const bVal = String(b.key[groupBy[0]] ?? '');
+      return aVal.localeCompare(bVal);
+    });
+  }
+
+  // Generate reconciliation checksum
+  const primaryAgg = aggregations[0];
+  let grandTotal: number;
+
+  if (groups && groups.length > 0) {
+    grandTotal = groups.reduce((sum, g) => sum + (g.values[primaryAgg.alias] ?? 0), 0);
+  } else {
+    grandTotal = results[primaryAgg.alias] ?? 0;
+  }
+
+  const reconciliation = createReconciliationChecksum(
+    grandTotal,
+    records.length,
+    primaryAgg.field,
+    primaryAgg.op
+  );
+
+  return {
+    results,
+    groups,
+    totalRecords: records.length,
+    truncated: false,
+    reconciliation
+  };
 }

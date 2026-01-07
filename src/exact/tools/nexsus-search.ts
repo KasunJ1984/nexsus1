@@ -28,7 +28,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { buildQdrantFilter, validateFilters, formatFiltersForDisplay, validateIndexedFields } from '../../common/services/filter-builder.js';
-import { executeAggregation } from '../services/aggregation-engine.js';
+import { executeAggregation, executeInMemoryAggregation } from '../services/aggregation-engine.js';
 import { scrollRecords } from '../../common/services/scroll-engine.js';
 import { isVectorClientAvailable } from '../../common/services/vector-client.js';
 import {
@@ -230,6 +230,34 @@ export const NexsusSearchSchema = z.object({
 
 // Type inference from schema
 export type NexsusSearchSchemaInput = z.infer<typeof NexsusSearchSchema>;
+
+// =============================================================================
+// LINKED GROUP BY HELPERS
+// =============================================================================
+
+/**
+ * Check if any GROUP BY field references linked data
+ *
+ * @example
+ * hasLinkedGroupBy(['_linked.Account_id.F1', 'Entity']) // true
+ * hasLinkedGroupBy(['Entity', 'F1']) // false
+ */
+function hasLinkedGroupBy(groupBy?: string[]): boolean {
+  return groupBy?.some(f => f.startsWith('_linked.')) ?? false;
+}
+
+/**
+ * Extract link field dependencies from linked GROUP BY fields
+ *
+ * @example
+ * extractLinkedFieldDependencies(['_linked.Account_id.F1', 'Entity'])
+ * // Returns: ['Account_id']
+ */
+function extractLinkedFieldDependencies(groupBy: string[]): string[] {
+  return groupBy
+    .filter(f => f.startsWith('_linked.'))
+    .map(f => f.split('.')[1]); // "_linked.Account_id.F1" → "Account_id"
+}
 
 // =============================================================================
 // TOOL REGISTRATION
@@ -521,15 +549,59 @@ See docs/SKILL-nexsus-search.md for detailed workflow guidance.
         // Determine query type and execute
         if (input.aggregations && input.aggregations.length > 0) {
           // AGGREGATION QUERY
-          // Aggregation: No artificial limit - process ALL matching records
-          // For large datasets, user can use export_to_file=true or detail_level="summary"
-          const result = await executeAggregation(
-            qdrantFilter,
-            input.aggregations as Aggregation[],
-            input.group_by,
-            undefined,  // No limit - trust the user, use export_to_file for large results
-            appFilters.length > 0 ? appFilters : undefined
-          );
+          let result: AggregationResult;
+
+          // Check if GROUP BY includes linked fields (e.g., "_linked.Account_id.F1")
+          if (hasLinkedGroupBy(input.group_by)) {
+            // LINKED GROUP BY: Must enrich records BEFORE aggregation
+            console.error(`[NexsusSearch] Linked GROUP BY detected: ${input.group_by?.filter(f => f.startsWith('_linked.')).join(', ')}`);
+
+            // 1. Scroll all matching records first
+            const scrollResult = await scrollRecords(
+              qdrantFilter,
+              {
+                limit: undefined,  // No limit - get all records
+                appFilters: appFilters.length > 0 ? appFilters : undefined
+              }
+            );
+
+            console.error(`[NexsusSearch] Scrolled ${scrollResult.records.length} records for linked GROUP BY`);
+
+            // 2. Get link dependencies from GROUP BY fields + explicit link param
+            const linkDeps = extractLinkedFieldDependencies(input.group_by!);
+            const combinedLinks = [...new Set([...(input.link || []), ...linkDeps])];
+
+            // 3. Enrich with _linked data
+            const preLinkResult = await resolveLinks(
+              scrollResult.records,
+              {
+                linkFields: combinedLinks,
+                returnFields: ['*'],  // Return all fields from linked records
+                limit: 10000,  // High limit for GROUP BY - we need all unique targets
+                modelName
+              }
+            );
+            const enrichedRecords = enrichRecordsWithLinks(scrollResult.records, combinedLinks, preLinkResult);
+
+            console.error(`[NexsusSearch] Enriched ${enrichedRecords.length} records with linked data from: ${combinedLinks.join(', ')}`);
+
+            // 4. Run in-memory aggregation on enriched records
+            result = executeInMemoryAggregation(
+              enrichedRecords,
+              input.aggregations as Aggregation[],
+              input.group_by
+            );
+          } else {
+            // STANDARD AGGREGATION: Process via Qdrant streaming (efficient for large datasets)
+            // No artificial limit - trust the user, use export_to_file for large results
+            result = await executeAggregation(
+              qdrantFilter,
+              input.aggregations as Aggregation[],
+              input.group_by,
+              undefined,
+              appFilters.length > 0 ? appFilters : undefined
+            );
+          }
 
           // Nexsus Link: Resolve linked records for GROUP BY enrichment
           // Uses resolveGroupLinks() to extract FK IDs directly from group keys
