@@ -23,7 +23,7 @@ import {
   getModelIdFromSchema,
   getModelIdFromData,
 } from '../services/schema-query-service.js';
-import { isValidModel, getModelNotFoundError } from '../services/model-registry.js';
+import { isValidModelAsync, getModelNotFoundError, getValidModelsAsync } from '../services/model-registry.js';
 import {
   retrievePointById,
   initializeVectorClient,
@@ -175,16 +175,19 @@ Examples:
           // Use direct UUID
           pointId = args.point_id;
         } else {
-          // Validate model exists in schema or data
+          // Validate model exists in schema or data (async - queries Qdrant)
           const pointType = args.collection === 'schema' ? 'schema' : 'data';
-          if (!isValidModel(args.model_name!, { point_type: pointType })) {
+          if (!await isValidModelAsync(args.model_name!, { point_type: pointType })) {
+            // Get valid models for better error message
+            const validModels = await getValidModelsAsync({ point_type: pointType });
             return {
               content: [{
                 type: 'text' as const,
-                text: getModelNotFoundError(args.model_name!, {
-                  point_type: pointType,
-                  toolName: 'inspect_record',
-                }),
+                text: `❌ Model "${args.model_name}" not found.
+
+**Available models:** ${validModels.join(', ') || 'none'}
+
+**Tip:** Use semantic_search to discover available models first.`,
               }],
             };
           }

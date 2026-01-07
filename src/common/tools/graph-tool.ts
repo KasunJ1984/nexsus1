@@ -28,7 +28,7 @@ import {
   isVectorClientAvailable,
 } from '../services/vector-client.js';
 import { getModelIdFromSchema, getModelIdFromData } from '../services/schema-query-service.js';
-import { isValidModel, getModelNotFoundError } from '../services/model-registry.js';
+import { isValidModelAsync, getModelNotFoundError, getValidModelsAsync } from '../services/model-registry.js';
 import { getGraphContext } from '../services/knowledge-graph.js';
 import { UNIFIED_CONFIG } from '../constants.js';
 import { buildDataUuidV2, isValidDataUuidV2 } from '../utils/uuid-v2.js';
@@ -618,15 +618,18 @@ crm.stage #1 → create_uid_qdrant → res.users #1 (OdooBot)
           initializeVectorClient();
         }
 
-        // Validate model exists in schema or data
-        if (!isValidModel(model_name, { point_type: 'all' })) {
+        // Validate model exists in schema or data (async - queries Qdrant)
+        if (!await isValidModelAsync(model_name, { point_type: 'all' })) {
+          // Get valid models for better error message
+          const validModels = await getValidModelsAsync({ point_type: 'all' });
           return {
             content: [{
               type: 'text' as const,
-              text: getModelNotFoundError(model_name, {
-                point_type: 'all',
-                toolName: 'graph_traverse',
-              }),
+              text: `❌ Model "${model_name}" not found.
+
+**Available models:** ${validModels.join(', ') || 'none'}
+
+**Tip:** Use semantic_search to discover available models first.`,
             }],
           };
         }
