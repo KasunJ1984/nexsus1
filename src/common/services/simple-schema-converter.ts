@@ -1,23 +1,30 @@
 /**
  * Simple Schema Converter
  *
- * Converts user's simplified 11-column schema format to internal NexsusSchemaRow format.
+ * Converts user's simplified schema format to internal NexsusSchemaRow format.
  *
- * User Format (SimpleSchemaRow):
- * - 11 columns: Field_ID, Model_ID, Field_Name, Field_Label, Field_Type, Model_Name,
- *   Stored, FK location field model, FK location field model id, FK location record Id,
- *   Qdrant ID for FK
- * - Multiple models in one file
- * - Human-readable format
+ * Supports two schema formats:
+ * 1. Simple Format (11 columns - backward compatible):
+ *    - Field_ID, Model_ID, Field_Name, Field_Label, Field_Type, Model_Name,
+ *      Stored, FK location field model, FK location field model id, FK location record Id,
+ *      Qdrant ID for FK
+ *
+ * 2. Extended Format (17 columns - with Level 4 Knowledge):
+ *    - All 11 Simple columns PLUS:
+ *    - Field_Knowledge (L), Valid_Values (M), Data_Format (N),
+ *      Calculation_Formula (O), Validation_Rules (P), LLM_Usage_Notes (Q)
  *
  * Internal Format (NexsusSchemaRow):
  * - 3 columns: Qdrant ID (UUID), Vector (semantic text), Payload (key-value string)
- * - Auto-generated semantic text for embedding
+ * - Auto-generated semantic text for embedding (includes Level 4 knowledge if present)
  * - Auto-generated V2 UUIDs
  * - FK metadata preserved for knowledge graph construction
  *
  * CRITICAL: FK metadata (FK location field model id, FK location record Id) must be
  * preserved in both semantic_text and raw_payload to enable knowledge graph edge creation.
+ *
+ * BACKWARD COMPATIBILITY: New Level 4 columns are optional. Schema files without
+ * these columns will continue to work exactly as before.
  */
 
 import { buildSchemaUuidV2Simple, buildSchemaFkRefUuidV2 } from '../utils/uuid-v2.js';
@@ -79,6 +86,22 @@ export function validateSimpleSchema(rows: SimpleSchemaRow[]): ValidationResult 
 
   rows.forEach((row, index) => {
     const rowNum = index + 2; // Excel row (1-indexed header + data)
+
+    // Skip completely empty rows (common at end of Excel files)
+    // XLSX may return empty cells as undefined, null, empty string, or not present at all
+    // Use type coercion to handle edge cases
+    const hasFieldId =
+      row.Field_ID !== undefined && row.Field_ID !== null && String(row.Field_ID).trim() !== '';
+    const hasModelId =
+      row.Model_ID !== undefined && row.Model_ID !== null && String(row.Model_ID).trim() !== '';
+    const hasFieldName = row.Field_Name && String(row.Field_Name).trim() !== '';
+    const hasModelName = row.Model_Name && String(row.Model_Name).trim() !== '';
+
+    const isEmptyRow = !hasFieldId && !hasModelId && !hasFieldName && !hasModelName;
+
+    if (isEmptyRow) {
+      return; // Skip this row
+    }
 
     // Check Field_ID
     if (row.Field_ID === undefined || row.Field_ID === null) {
@@ -164,7 +187,10 @@ export function validateSimpleSchema(rows: SimpleSchemaRow[]): ValidationResult 
  * CRITICAL: FK metadata MUST be included in semantic text to enable
  * knowledge graph edge creation and traversal.
  *
- * @param row - Simple schema row
+ * ENHANCEMENT: If Level 4 knowledge columns are present (Field_Knowledge,
+ * Valid_Values, etc.), they are appended to enrich the semantic embedding.
+ *
+ * @param row - Simple schema row (may include Level 4 knowledge columns)
  * @param fkUuid - Optional FK Qdrant UUID (for many2one fields)
  * @returns Semantic text string for embedding
  */
@@ -200,6 +226,35 @@ export function generateSemanticText(row: SimpleSchemaRow, fkUuid?: string): str
   // Add FK Qdrant UUID if available (CRITICAL for graph traversal)
   if (fkUuid) {
     text += `, Qdrant ID for FK - ${fkUuid}`;
+  }
+
+  // ENHANCEMENT: Append Level 4 Knowledge columns if present (backward compatible)
+  // These columns are optional and enhance the semantic embedding for better search
+  const rowAny = row as unknown as Record<string, unknown>;
+
+  const fieldKnowledge = rowAny['Field_Knowledge'];
+  if (fieldKnowledge && String(fieldKnowledge).trim()) {
+    text += `. Field meaning: ${String(fieldKnowledge).trim()}`;
+  }
+
+  const validValues = rowAny['Valid_Values'];
+  if (validValues && String(validValues).trim()) {
+    text += `. Valid values: ${String(validValues).trim()}`;
+  }
+
+  const dataFormat = rowAny['Data_Format'];
+  if (dataFormat && String(dataFormat).trim()) {
+    text += `. Format: ${String(dataFormat).trim()}`;
+  }
+
+  const calculationFormula = rowAny['Calculation_Formula'];
+  if (calculationFormula && String(calculationFormula).trim()) {
+    text += `. Formula: ${String(calculationFormula).trim()}`;
+  }
+
+  const llmUsageNotes = rowAny['LLM_Usage_Notes'];
+  if (llmUsageNotes && String(llmUsageNotes).trim()) {
+    text += `. LLM guidance: ${String(llmUsageNotes).trim()}`;
   }
 
   return text;
@@ -282,8 +337,19 @@ export function convertSimpleSchemaToNexsus(rows: SimpleSchemaRow[]): NexsusSche
     validation.warnings.forEach((w) => console.error(`  - ${w}`));
   }
 
-  // Convert each row
-  const converted: NexsusSchemaRow[] = rows.map((row) => {
+  // Filter out empty rows before conversion (same logic as validation)
+  const validRows = rows.filter((row) => {
+    const hasFieldId =
+      row.Field_ID !== undefined && row.Field_ID !== null && String(row.Field_ID).trim() !== '';
+    const hasModelId =
+      row.Model_ID !== undefined && row.Model_ID !== null && String(row.Model_ID).trim() !== '';
+    const hasFieldName = row.Field_Name && String(row.Field_Name).trim() !== '';
+    const hasModelName = row.Model_Name && String(row.Model_Name).trim() !== '';
+    return hasFieldId || hasModelId || hasFieldName || hasModelName;
+  });
+
+  // Convert each valid row
+  const converted: NexsusSchemaRow[] = validRows.map((row) => {
     // Generate V2 UUID for this field using actual model_id (not hardcoded 0004)
     const uuid = buildSchemaUuidV2Simple(row.Field_ID, row.Model_ID);
 

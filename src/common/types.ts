@@ -2770,6 +2770,93 @@ export interface PersonaDefinition {
 }
 
 // =============================================================================
+// EXTENDED KNOWLEDGE TYPES (4-Level Knowledge Template)
+// =============================================================================
+
+/**
+ * Knowledge level discriminator for 4-level knowledge template
+ *
+ * - universal: Level 1 - Static knowledge for all Nexsus (markdown files)
+ * - instance: Level 2 - MCP instance configuration (from Excel)
+ * - model: Level 3 - Table/model metadata (from Excel)
+ * - field: Level 4 - Field-level knowledge (from Excel)
+ */
+export type KnowledgeLevel = 'universal' | 'instance' | 'model' | 'field';
+
+/**
+ * Extended Knowledge Payload - Union type for all knowledge levels
+ *
+ * Stored in Qdrant with:
+ * - point_type: 'knowledge'
+ * - knowledge_level: one of KnowledgeLevel values
+ *
+ * UUID Format: 00000005-LLLL-MMMM-0000-IIIIIIIIIIII
+ * Where:
+ * - 00000005 = Extended knowledge namespace
+ * - LLLL = Level (0002=instance, 0003=model, 0004=field)
+ * - MMMM = Model_ID (0000 for instance level)
+ * - IIIIIIIIIIII = Item index or Field_ID
+ */
+export interface ExtendedKnowledgePayload {
+  // Common (all levels)
+  point_type: 'knowledge';
+  knowledge_level: KnowledgeLevel;
+  vector_text: string;
+  sync_timestamp: string;
+
+  // Level 2 (Instance) - MCP instance configuration
+  config_key?: string;
+  config_value?: string;
+  config_category?: string;
+  description?: string;
+  applies_to?: string;
+  llm_instruction?: string;
+
+  // Level 3 (Model) - Table/model metadata
+  model_id?: number;
+  model_name?: string;
+  business_name?: string;
+  business_purpose?: string;
+  data_grain?: string;
+  record_count?: number;
+  is_payload_enabled?: boolean;
+  primary_use_cases?: string;
+  key_relationships?: string;
+  llm_query_guidance?: string;
+  known_issues?: string;
+
+  // Level 4 (Field) - Field-level knowledge
+  field_id?: number;
+  field_name?: string;
+  field_label?: string;
+  field_type?: string;
+  field_knowledge?: string;
+  valid_values?: string[];
+  data_format?: string;
+  calculation_formula?: string;
+  validation_rules?: string;
+  llm_usage_notes?: string;
+
+  // Common optional fields
+  last_updated?: string;
+}
+
+/**
+ * Type guard to check if payload is ExtendedKnowledgePayload
+ */
+export function isKnowledgePayload(payload: unknown): payload is ExtendedKnowledgePayload {
+  if (!payload || typeof payload !== 'object') return false;
+  return (payload as ExtendedKnowledgePayload).point_type === 'knowledge';
+}
+
+/**
+ * Get knowledge level from payload
+ */
+export function getKnowledgeLevel(payload: ExtendedKnowledgePayload): KnowledgeLevel {
+  return payload.knowledge_level;
+}
+
+// =============================================================================
 // SECTION ADAPTER TYPES (Shared by all section adapters)
 // =============================================================================
 

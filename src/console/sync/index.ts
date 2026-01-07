@@ -24,7 +24,11 @@ import { analyzePatternsCommand } from './commands/analyze-patterns.js';
 import { statusCommand } from './commands/status.js';
 import { fixOrphansCommand } from './commands/fix-orphans.js';
 import { updatePayloadCommand } from './commands/update-payload.js';
-import { syncKnowledgeCommand } from '../../knowledge/dynamic/loaders/index.js';
+import {
+  syncKnowledgeCommand,
+  syncExtendedKnowledgeCommand,
+  type ExtendedKnowledgeSyncOptions,
+} from '../../knowledge/dynamic/loaders/index.js';
 
 const program = new Command();
 
@@ -77,6 +81,33 @@ syncCmd
   .option('--dry-run', 'Preview without syncing', false)
   .option('--force', 'Force recreate knowledge (delete existing)', false)
   .action(syncKnowledgeCommand);
+
+// sync knowledge-extended (Levels 2, 3, 4 from Excel)
+syncCmd
+  .command('knowledge-extended')
+  .description('Sync extended knowledge (Instance Config L2, Model Metadata L3, Field Knowledge L4) from Excel')
+  .option('--levels <levels>', 'Levels to sync: instance,model,field,all (comma-separated)', 'all')
+  .option('--validate-only', 'Validate only, do not sync', false)
+  .option('--force', 'Force rebuild (delete existing extended knowledge)', false)
+  .option('--file <path>', 'Custom Excel file path (default: samples/Nexsus1_schema.xlsx)')
+  .option('--include-all-fields', 'Include all fields in Level 4, not just those with knowledge', false)
+  .action(async (options: { levels: string; validateOnly?: boolean; force?: boolean; file?: string; includeAllFields?: boolean }) => {
+    // Parse levels option
+    const levelsList = options.levels.toLowerCase().split(',').map(l => l.trim());
+    const levels: ('instance' | 'model' | 'field' | 'all')[] = levelsList.includes('all')
+      ? ['all']
+      : levelsList.filter((l): l is 'instance' | 'model' | 'field' => ['instance', 'model', 'field'].includes(l));
+
+    const syncOptions: ExtendedKnowledgeSyncOptions = {
+      levels,
+      validateOnly: options.validateOnly,
+      force: options.force,
+      excelPath: options.file,
+      includeAllFields: options.includeAllFields,
+    };
+
+    await syncExtendedKnowledgeCommand(syncOptions);
+  });
 
 // cleanup <model_name>
 program
