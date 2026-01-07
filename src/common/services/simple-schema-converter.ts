@@ -163,6 +163,8 @@ export function validateSimpleSchema(rows: SimpleSchemaRow[]): ValidationResult 
     }
 
     // Check FK field completeness (warn, don't error)
+    // NOTE: FK_location_record_Id is NOT checked here because it's auto-generated
+    // during data sync from actual record IDs, not stored in the schema file.
     const isFkField = ['many2one', 'many2many', 'one2many'].includes(
       row.Field_Type?.toLowerCase() || '',
     );
@@ -170,23 +172,18 @@ export function validateSimpleSchema(rows: SimpleSchemaRow[]): ValidationResult 
     if (isFkField) {
       const fkModel = getFkField<string>(row, 'FK location field model');
       const fkModelId = getFkField<number>(row, 'FK location field model id');
-      const fkRecordId = getFkField<number>(row, 'FK location record Id');
 
       if (!fkModel) {
         result.warnings.push(
-          `Row ${rowNum}: FK field "${row.Field_Name}" missing FK location field model`,
+          `Row ${rowNum}: FK field "${row.Field_Name}" missing FK_location_field_model`,
         );
       }
       if (fkModelId === undefined || fkModelId === null) {
         result.warnings.push(
-          `Row ${rowNum}: FK field "${row.Field_Name}" missing FK location field model id`,
+          `Row ${rowNum}: FK field "${row.Field_Name}" missing FK_location_field_model_id`,
         );
       }
-      if (fkRecordId === undefined || fkRecordId === null) {
-        result.warnings.push(
-          `Row ${rowNum}: FK field "${row.Field_Name}" missing FK location record Id`,
-        );
-      }
+      // FK_location_record_Id is auto-generated during data sync - no warning needed
     }
   });
 
