@@ -128,7 +128,7 @@ export const NexsusSearchSchema = z.object({
 
   group_by: z.array(z.string())
     .optional()
-    .describe('Fields to group by (only with aggregations)'),
+    .describe('Fields to group by (only with aggregations). Supports _linked.FK.Field syntax for grouping by linked record fields (e.g., "_linked.Account_id.F1").'),
 
   fields: z.array(z.string())
     .optional()
@@ -324,6 +324,16 @@ See docs/SKILL-nexsus-search.md for detailed workflow guidance.
   "filters": [{"field": "partner_id.name", "op": "contains", "value": "Wadsworth"}],
   "aggregations": [{"field": "debit", "op": "sum", "alias": "total"}]
 }
+
+**LINKED GROUP BY - Group by fields from FK-linked records:**
+{
+  "model_name": "actual",
+  "filters": [{"field": "Entity", "op": "eq", "value": "AU"}],
+  "aggregations": [{"field": "Amount", "op": "sum", "alias": "total"}],
+  "group_by": ["_linked.Account_id.F1"],
+  "link": ["Account_id"]
+}
+// Use _linked.FKField.TargetField syntax to group by a field from linked master records
 
 **SYSTEM FIELDS:** point_id, point_type, sync_timestamp, record_id, model_id, model_name, vector_text
 
