@@ -456,6 +456,26 @@ export async function resolveLinks(
       if (!('display_name' in data) && 'display_name' in payload) {
         data.display_name = payload.display_name;
       }
+
+      // FIX: Fallback if data is still empty (handles dynamic column names)
+      if (Object.keys(data).length === 0) {
+        // Include commonly useful identifier fields
+        const fallbackFields = ['name', 'display_name', 'Gllinkname', 'Id', 'id', 'record_id'];
+        for (const fb of fallbackFields) {
+          if (fb in payload) {
+            data[fb] = payload[fb];
+          }
+        }
+
+        // If STILL empty, include first 5 non-system fields
+        if (Object.keys(data).length === 0) {
+          const systemFields = ['point_id', 'point_type', 'model_id', 'sync_timestamp', 'vector_text'];
+          const userFields = Object.keys(payload).filter(k => !systemFields.includes(k));
+          for (const uf of userFields.slice(0, 5)) {
+            data[uf] = payload[uf];
+          }
+        }
+      }
     }
 
     const linked: LinkedRecord = {
@@ -510,9 +530,35 @@ export function enrichRecordsWithLinks(
     const _linked: Record<string, LinkedRecord | null> = {};
 
     for (const field of linkFields) {
-      // Get the FK ID from the record
+      // Get the FK ID from the record (with multiple fallback strategies)
       const idField = `${field}_id`;
-      const recordId = record[idField] as number | undefined;
+      let recordId: number | undefined;
+
+      // Strategy 1: Exact field_id match (e.g., "Account_id_id" - unlikely but try first)
+      recordId = record[idField] as number | undefined;
+
+      // Strategy 2: Direct field as scalar (e.g., "Account_id" is the numeric FK ID)
+      if (recordId === undefined && typeof record[field] === 'number') {
+        recordId = record[field] as number;
+      }
+
+      // Strategy 3: Case-insensitive search for field_id pattern
+      if (recordId === undefined) {
+        const keys = Object.keys(record);
+        const matchKey = keys.find(k => k.toLowerCase() === idField.toLowerCase());
+        if (matchKey) {
+          recordId = record[matchKey] as number | undefined;
+        }
+      }
+
+      // Strategy 4: Case-insensitive search for direct field
+      if (recordId === undefined) {
+        const keys = Object.keys(record);
+        const matchKey = keys.find(k => k.toLowerCase() === field.toLowerCase());
+        if (matchKey && typeof record[matchKey] === 'number') {
+          recordId = record[matchKey] as number;
+        }
+      }
 
       if (recordId && linkResult.linked.get(field)?.has(recordId)) {
         _linked[field] = linkResult.linked.get(field)!.get(recordId)!;
