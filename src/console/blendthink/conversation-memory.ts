@@ -173,6 +173,10 @@ async function embedTurnAsync(
   sessionId: string,
   turn: ConversationTurn
 ): Promise<void> {
+  // Get session to determine turn number
+  const session = activeSessions.get(sessionId);
+  const turnNumber = session ? session.turns.length : 0;
+
   // Build vector text
   const vectorText = buildVectorText(turn);
 
@@ -187,7 +191,7 @@ async function embedTurnAsync(
   const payload: ConversationPayload = {
     point_type: 'conversation',
     session_id: sessionId,
-    turn_number: 0, // TODO: track turn number
+    turn_number: turnNumber,
     role: turn.role,
     content: turn.content,
     question_type: turn.analysis?.type,

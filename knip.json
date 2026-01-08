@@ -1,0 +1,19 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "entry": [
+    "src/console/index.ts",
+    "src/console/sync/index.ts"
+  ],
+  "project": [
+    "src/**/*.ts"
+  ],
+  "ignore": [
+    "scripts/**",
+    "scripts/archive/**",
+    "**/*.test.ts",
+    "**/__tests__/**"
+  ],
+  "ignoreDependencies": [
+    "tsx"
+  ]
+}
