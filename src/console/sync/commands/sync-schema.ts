@@ -11,6 +11,7 @@ import { initializeVectorClient, getQdrantClient } from '../../../common/service
 import { initializeEmbeddingService } from '../../../common/services/embedding-service.js';
 import { syncSchemaToUnified } from '../../../common/services/unified-schema-sync.js';
 import { clearSchemaCache } from '../../../common/services/schema-query-service.js';
+import { clearSchemaLookup } from '../../../common/services/schema-lookup.js';
 import { UNIFIED_CONFIG } from '../../../common/constants.js';
 
 interface SyncSchemaOptions {
@@ -106,7 +107,8 @@ export async function syncSchemaCommand(options: SyncSchemaOptions): Promise<voi
 
       // G13: Auto-clear schema cache so pipeline uses fresh schema
       clearSchemaCache();
-      console.log(chalk.green('Schema cache cleared - pipeline will use fresh schema'));
+      clearSchemaLookup();
+      console.log(chalk.green('All schema caches cleared - pipeline will use fresh schema'));
     } else {
       // Odoo source - use schema-sync service
       // Note: This would need to be implemented or imported

@@ -311,6 +311,49 @@ export function clearSchemaLookup(): void {
   initialized = false;
 }
 
+/**
+ * Refresh schema lookup - clears cache and reloads from Excel
+ *
+ * Use this after syncing new models/fields to make them immediately
+ * available without server restart.
+ *
+ * @returns Stats about the reloaded schema
+ */
+export function refreshSchemaLookup(): {
+  models_loaded: number;
+  fields_loaded: number;
+  fk_fields_loaded: number;
+} {
+  console.error('[SchemaLookup] Refreshing schema from Excel...');
+
+  clearSchemaLookup();
+  initializeSchemaLookup();
+
+  // Return stats from cached data
+  const modelCount = validModels?.size ?? 0;
+  const fieldCount = schemaLookup
+    ? Array.from(schemaLookup.values()).reduce((sum, m) => sum + m.size, 0)
+    : 0;
+
+  // Count FK fields
+  let fkCount = 0;
+  if (schemaLookup) {
+    for (const modelMap of schemaLookup.values()) {
+      for (const field of modelMap.values()) {
+        if (field.is_fk) fkCount++;
+      }
+    }
+  }
+
+  console.error(`[SchemaLookup] Refreshed: ${modelCount} models, ${fieldCount} fields, ${fkCount} FK fields`);
+
+  return {
+    models_loaded: modelCount,
+    fields_loaded: fieldCount,
+    fk_fields_loaded: fkCount
+  };
+}
+
 // =============================================================================
 // FIELD LOOKUPS
 // =============================================================================
