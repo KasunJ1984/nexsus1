@@ -10,8 +10,7 @@ import chalk from 'chalk';
 import { initializeVectorClient, getQdrantClient } from '../../../common/services/vector-client.js';
 import { initializeEmbeddingService } from '../../../common/services/embedding-service.js';
 import { syncSchemaToUnified } from '../../../common/services/unified-schema-sync.js';
-import { clearSchemaCache } from '../../../common/services/schema-query-service.js';
-import { clearSchemaLookup } from '../../../common/services/schema-lookup.js';
+import { refreshAllCaches } from '../../../common/services/schema-cache-manager.js';
 import { UNIFIED_CONFIG } from '../../../common/constants.js';
 
 interface SyncSchemaOptions {
@@ -105,10 +104,20 @@ export async function syncSchemaCommand(options: SyncSchemaOptions): Promise<voi
 
       console.log(chalk.green(`✅ Synced ${result.uploaded} schema rows successfully`));
 
-      // G13: Auto-clear schema cache so pipeline uses fresh schema
-      clearSchemaCache();
-      clearSchemaLookup();
-      console.log(chalk.green('All schema caches cleared - pipeline will use fresh schema'));
+      // G13: Auto-clear ALL schema caches so pipeline uses fresh schema
+      // Uses central cache manager to ensure no cache is forgotten
+      const refreshResult = refreshAllCaches();
+      console.log(chalk.green(`All ${refreshResult.caches_cleared.length} schema caches cleared in ${refreshResult.duration_ms}ms`));
+      console.log(chalk.white('  Models:'), chalk.cyan(`${refreshResult.models_before} → ${refreshResult.models_after}`));
+      console.log(chalk.white('  Fields:'), chalk.cyan(refreshResult.fields_loaded.toString()));
+      console.log(chalk.white('  FK fields:'), chalk.cyan(refreshResult.fk_fields_loaded.toString()));
+
+      if (refreshResult.models_added.length > 0) {
+        console.log(chalk.green('  Models added:'), chalk.yellow(refreshResult.models_added.join(', ')));
+      }
+      if (refreshResult.models_removed.length > 0) {
+        console.log(chalk.red('  Models removed:'), chalk.yellow(refreshResult.models_removed.join(', ')));
+      }
     } else {
       // Odoo source - use schema-sync service
       // Note: This would need to be implemented or imported
