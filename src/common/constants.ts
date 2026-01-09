@@ -52,12 +52,12 @@ export const QDRANT_CONFIG = {
  * Nexsus Excel configuration
  *
  * Configuration for reading schema from Excel files.
- * Uses nexsus_schema_v2_generated.xlsx with FK metadata.
+ * Uses samples/Nexsus1_schema.xlsx (Simple 11-column format).
  * Note: Collection is now unified (nexsus_unified) - see UNIFIED_CONFIG.
  */
 export const NEXSUS_CONFIG = {
-  /** Path to Excel schema file (V2 format with FK metadata) */
-  EXCEL_FILE: process.env.NEXSUS_EXCEL_FILE || 'nexsus_schema_v2_generated.xlsx',
+  /** Path to Excel schema file (Simple format with FK metadata) */
+  EXCEL_FILE: process.env.NEXSUS_EXCEL_FILE || 'samples/Nexsus1_schema.xlsx',
   /** Vector dimensions (Voyage AI) */
   VECTOR_SIZE: parseInt(process.env.VECTOR_SIZE || '1024', 10),
 } as const;
@@ -286,7 +286,7 @@ export const TRAINING_CONFIG = {
  *
  * Excel Files:
  * - feilds_to_add_payload.xlsx: Defines which fields go in payload (payload=1)
- * - nexsus_schema_v2_generated.xlsx: Schema with FK metadata (via loadNexsusSchema)
+ * - samples/Nexsus1_schema.xlsx: Schema with FK metadata (via loadNexsusSchema)
  *
  * Vector IDs use V2 UUID format: 00000002-MMMM-0000-0000-RRRRRRRRRRRR
  */
