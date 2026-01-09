@@ -29,6 +29,7 @@ import { registerUrlBuilderTool } from '../common/tools/url-builder-tool.js';
 import { registerInspectGraphEdgeTool } from '../common/tools/inspect-graph-edge.js';
 import { registerBlendthinkDiagnoseTool } from './blendthink/tools/diagnose-tool.js';
 import { registerBlendthinkExecuteTool } from './blendthink/tools/execute-tool.js';
+import { registerRefreshSchemaTool } from '../common/tools/refresh-schema-tool.js';
 import { initializeConversationMemory, shutdownConversationMemory } from './blendthink/conversation-memory.js';
 import { initializeEmbeddingService, isEmbeddingServiceAvailable } from '../common/services/embedding-service.js';
 import { initializeVectorClient, validateQdrantConnection, isVectorClientAvailable } from '../common/services/vector-client.js';
@@ -86,6 +87,9 @@ registerBlendthinkDiagnoseTool(server);
 
 // Register blendthink execute tool (blendthink_execute) for full query execution
 registerBlendthinkExecuteTool(server);
+
+// Register refresh schema tool (refresh_schema) for on-demand cache refresh
+registerRefreshSchemaTool(server);
 
 // =============================================================================
 // STDIO TRANSPORT (for Desktop Claude & Claude Code)

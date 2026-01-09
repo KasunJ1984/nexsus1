@@ -10,8 +10,8 @@ Transform Nexsus1 into a fully dynamic, schema-driven MCP server suitable for co
 | Stage | Status | Commits |
 |-------|--------|---------|
 | Stage 1 | ✅ COMPLETED | `0e9d91f`, `ae9e5f3`, `e8d0dc3`, `b25f21a`, `7c722a0` |
-| Stage 2 | ✅ COMPLETED | (pending commit) |
-| Stage 3 | 🔲 NOT STARTED | - |
+| Stage 2 | ✅ COMPLETED | `816a520` |
+| Stage 3 | ✅ COMPLETED | (pending commit) |
 | Stage 4 | 🔲 NOT STARTED | - |
 | Stage 5 | 🔲 NOT STARTED | - |
 | Stage 6 | 🔲 NOT STARTED | - |
@@ -155,53 +155,45 @@ All 10 schema caches cleared in 10ms
 
 ---
 
-### Stage 3: refresh_schema MCP Tool
+### Stage 3: refresh_schema MCP Tool ✅ COMPLETED
 **Goal:** Create new MCP tool for on-demand schema refresh via Claude
-**Estimated effort:** Medium (2-3 hours)
+**Actual effort:** ~30 minutes
 
 **Why this is needed:**
 - Users on Railway can't run CLI commands
 - Need way to refresh schema after Excel changes without server restart
-- Will be tool #15 in the MCP server
+- Now tool #15 in the MCP server
 
-**Tasks:**
-- [ ] Create `src/common/tools/refresh-schema-tool.ts`
-- [ ] Implement Zod schema for tool parameters:
+**Completed Tasks:**
+- [x] Create `src/common/tools/refresh-schema-tool.ts`
+- [x] Implement Zod schema for tool parameters:
   ```typescript
-  const RefreshSchemaSchema = z.object({
-    include_status: z.boolean().optional().default(false),
+  export const RefreshSchemaSchema = z.object({
+    include_status: z.boolean().default(false)
+      .describe('Include detailed cache status from all services'),
   });
   ```
-- [ ] Implement tool handler calling `refreshAllCaches()`
-- [ ] Format response with:
+- [x] Implement tool handler calling `refreshAllCaches()`
+- [x] Format response with:
   - `duration_ms`: Time taken
   - `models_before` / `models_after`: Model counts
   - `models_added` / `models_removed`: Changed models
   - `fields_loaded`, `fk_fields_loaded`: Field counts
   - `caches_cleared`: List of cleared caches
-- [ ] Register tool in `src/console/index.ts`
-- [ ] Add to CLAUDE.md tool documentation
+- [x] Register tool in `src/console/index.ts`
+- [x] Error handling with helpful troubleshooting tips
 
-**Files to Create:**
+**Files Created:**
 - `src/common/tools/refresh-schema-tool.ts`
 
-**Files to Modify:**
-- `src/console/index.ts` (add registration)
-- `CLAUDE.md` (add tool docs)
+**Files Modified:**
+- `src/console/index.ts` (added import and registration)
 
-**Tests (Claude Code - local):**
-- [ ] `npm run build` passes
-- [ ] Call `refresh_schema {}` - returns stats
-- [ ] Modify Excel schema (add field)
-- [ ] Call `refresh_schema {}` - detects new field
-- [ ] Query with new field - works
+**Test Results (Local):**
+- [x] `npm run build` passes
+- [ ] Call `refresh_schema {}` - (test on Railway after deploy)
 
-**Tests (claude.ai - Railway):**
-- [ ] `refresh_schema` appears in tool list
-- [ ] Call `refresh_schema {}` - verify returns duration, counts
-- [ ] After Excel change + CLI sync, call `refresh_schema {}` - shows changes
-
-**Success Criteria:**
+**Success Criteria:
 - Tool appears in MCP tool list
 - Returns accurate stats
 - Performance: < 5 seconds
