@@ -285,14 +285,14 @@ export const TRAINING_CONFIG = {
  * Data Pipeline Configuration
  *
  * Excel Files:
- * - feilds_to_add_payload.xlsx: Defines which fields go in payload (payload=1)
+ * - samples/SAMPLE_payload_config.xlsx: Defines which fields go in payload (payload=1)
  * - samples/Nexsus1_schema.xlsx: Schema with FK metadata (via loadNexsusSchema)
  *
  * Vector IDs use V2 UUID format: 00000002-MMMM-0000-0000-RRRRRRRRRRRR
  */
 export const PIPELINE_CONFIG = {
   /** Excel file that defines which fields go in payload (payload=1) */
-  PAYLOAD_FIELDS_FILE: process.env.PIPELINE_PAYLOAD_FILE || 'feilds_to_add_payload.xlsx',
+  PAYLOAD_FIELDS_FILE: process.env.PIPELINE_PAYLOAD_FILE || 'samples/SAMPLE_payload_config.xlsx',
 
   /** Vector dimensions (Voyage AI voyage-3.5-lite uses 1024) */
   VECTOR_SIZE: parseInt(process.env.PIPELINE_VECTOR_SIZE || '1024', 10),
